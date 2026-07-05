@@ -1,0 +1,13 @@
+# Database
+DATABASE_URL=postgresql://user:password@localhost:5432/wnd_db
+
+# OpenAI API (или другой LLM провайдер)
+OPENAI_API_KEY=your_api_key_here
+
+# Secret key для приложения
+SECRET_KEY=your_secret_key_here
+
+
+
+
+

@@ -1,0 +1,49 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+
+# Environment variables
+.env
+
+# Database
+*.db
+*.sqlite
+chroma_db/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+
+# Рабочие данные (структура каталогов хранится в репозитории)
+logs/
+IN/*
+!IN/.gitkeep
+OUT/*
+!OUT/.gitkeep
+FZ/*
+!FZ/.gitkeep
+FZYur/*
+!FZYur/.gitkeep
+new-doc/*
+!new-doc/.gitkeep
+
