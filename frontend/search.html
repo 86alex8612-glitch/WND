@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Поиск в ВНД - НейроКонсультант</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260801">
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <h1>НейроКонсультант по организационно-распорядительным документам</h1>
+            <button class="btn-back" id="btn-search-back" type="button">← Назад</button>
+        </div>
+    </header>
+
+    <main class="search-content">
+        <div class="search-page-container search-container">
+            <h2>Поиск в ВНД</h2>
+            <p class="search-intro">Задайте вопросы по содержанию внутреннего нормативного документа. Отчёт анализа подключается автоматически, если найден по имени документа.</p>
+
+            <div id="search-setup-panel" class="search-setup-panel">
+                <p id="search-setup-reselect-hint" class="search-reselect-hint" hidden>
+                    Для повторного выбора файлов нажмите «Начать новый».
+                </p>
+                <div class="search-source-grid">
+                    <section class="search-source-card">
+                        <h3>Загрузить документ</h3>
+                        <p class="stage-subtitle">Выберите файл ВНД — загрузка начнётся автоматически.</p>
+                        <label for="search-file-input">ВНД (обязательно)</label>
+                        <input type="file" id="search-file-input" accept=".pdf,.docx,.doc,.txt,.md" />
+                        <label for="search-analysis-input">Отчёт анализа (необязательно)</label>
+                        <input type="file" id="search-analysis-input" accept=".pdf,.docx,.doc,.txt,.md" />
+                        <p class="stage1-hint">Если отчёт не выбран, система попытается найти его в подпапках OUT и IN рабочей папки (config.cfg).</p>
+                        <button class="btn-primary" id="btn-search-upload" type="button">Начать диалог</button>
+                        <div id="search-upload-status" class="upload-status"></div>
+                    </section>
+
+                    <section class="search-source-card">
+                        <h3>Выбрать из базы ВНД</h3>
+                        <p class="stage-subtitle">Документ из базы; отчёт анализа подбирается автоматически.</p>
+                        <label for="search-db-select">Документ ВНД</label>
+                        <select id="search-db-select" class="create-text-input">
+                            <option value="">— Загрузка списка… —</option>
+                        </select>
+                        <label for="search-analysis-select">Отчёт анализа (необязательно)</label>
+                        <select id="search-analysis-select" class="create-text-input">
+                            <option value="">— Автоподбор —</option>
+                        </select>
+                        <button class="btn-secondary" id="btn-search-from-db" type="button">Начать диалог</button>
+                        <div id="search-db-status" class="upload-status"></div>
+                    </section>
+                </div>
+            </div>
+
+            <div id="search-chat-panel" class="search-chat-panel">
+                <div class="search-chat-box">
+                    <div class="search-chat-header">
+                        <p id="search-doc-title" class="search-doc-title"></p>
+                        <p id="search-analysis-title" class="search-analysis-title"></p>
+                    </div>
+                    <div id="search-chat-messages" class="chat-messages search-chat-messages"></div>
+                    <div class="chat-input-container search-chat-input-row">
+                        <textarea id="search-chat-input" rows="2" placeholder="Сначала загрузите или выберите документ ВНД" disabled></textarea>
+                        <button class="btn-primary" id="btn-search-send" type="button" disabled>Отправить</button>
+                    </div>
+                </div>
+                <div class="search-chat-footer">
+                    <button class="btn-danger" id="btn-search-finish" type="button">Завершить диалог</button>
+                    <button class="btn-secondary" id="btn-search-new" type="button">Начать новый</button>
+                    <button class="btn-success" id="btn-search-save" type="button">Сохранить</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="footer-content">
+            <p>Разработчик: Алексей Ларионов</p>
+        </div>
+    </footer>
+
+    <script src="/static/errors.js"></script>
+    <script src="/static/config-ui.js?v=20260801"></script>
+    <script src="/static/downloads.js"></script>
+    <script src="/static/search.js?v=20260801"></script>
+</body>
+</html>

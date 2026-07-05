@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ ВНД - НейроКонсультант</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260801">
+</head>
+<body>
+    <!-- Шапка -->
+    <header class="header">
+        <div class="header-content">
+            <h1>НейроКонсультант по организационно-распорядительным документам</h1>
+            <button class="btn-back" onclick="window.location.href='/'">← Назад</button>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main class="analiz-content">
+        <div class="analiz-container">
+            <h2>Анализ внутренних нормативных документов</h2>
+
+            <div class="analiz-landing" id="analiz-landing">
+                <details class="analiz-guide">
+                    <summary class="analiz-guide-summary">Как пользоваться разделом</summary>
+                    <ol class="analiz-guide-list">
+                        <li>Загрузите файл ВНД (PDF, DOCX или TXT). Документ сохраняется в подпапку <strong>IN</strong> рабочей папки (см. ⚙ Настройки на главном экране).</li>
+                        <li>Убедитесь, что справа отображается успешная загрузка и корректное название документа.</li>
+                        <li>Нажмите <strong>«Начать анализ»</strong>. При необходимости система предложит скачать недостающие федеральные акты в папку <strong>FZ</strong>.</li>
+                        <li>На этапе 1 уточните параметры организации и области законодательства.</li>
+                        <li>На этапе 2 получите правовой отчёт. Кнопка <strong>«Сохранить»</strong> записывает PDF в подпапку <strong>OUT</strong>.</li>
+                    </ol>
+                    <p class="analiz-guide-note">
+                        Пути к папкам задаются в файле <strong>config.cfg</strong> (⚙ Настройки на главном экране). По умолчанию: <strong>C:\WND\</strong>.
+                    </p>
+                    <button type="button" class="btn-secondary analiz-guide-files-btn" onclick="openAnalizFilesModal()">
+                        Правила работы с файлами
+                    </button>
+                </details>
+
+                <section class="analiz-setup-card">
+                    <div class="analiz-setup-grid">
+                        <div class="analiz-upload-col">
+                            <h3>1. Загрузить документ для анализа</h3>
+                            <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" />
+                            <button type="button" class="btn-primary" onclick="uploadDocument()">Загрузить</button>
+                        </div>
+                        <div class="analiz-upload-status-col">
+                            <h3 class="analiz-status-heading">Статус загрузки</h3>
+                            <div id="upload-result" class="upload-result analiz-upload-result-panel">
+                                <div id="upload-result-content" class="analiz-upload-placeholder">
+                                    Выберите файл и нажмите «Загрузить»
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analiz-start-bar">
+                        <div class="analiz-start-info">
+                            <h3>2. Начать анализ</h3>
+                            <div id="vnd-name-display" class="vnd-name-display">
+                                <span class="vnd-name-label">Название ВНД</span>
+                                <span id="vnd-name-text" class="vnd-name-text is-empty">Документ ещё не загружен</span>
+                            </div>
+                        </div>
+                        <div class="analiz-start-actions">
+                            <button type="button" class="btn-primary analiz-start-btn" id="btn-start-analysis" onclick="startNewDialog()" disabled>
+                                Начать анализ
+                            </button>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div class="analiz-layout">
+                <div class="analiz-main-content">
+                    <!-- Блок проверки ссылок на федеральные документы -->
+                    <div id="federal-refs-panel" class="federal-refs-panel" style="display: none;">
+                        <div class="federal-refs-content">
+                            <h3>Ссылки на федеральные документы</h3>
+                            <p id="federal-refs-subtitle" class="federal-refs-subtitle">
+                                В загруженном ВНД обнаружены ссылки на федеральные документы, которых нет в локальной базе:
+                            </p>
+                            <ul id="federal-refs-list" class="federal-refs-list"></ul>
+                            <div id="federal-refs-status" class="federal-refs-status" style="display: none;"></div>
+                            <div id="federal-refs-actions" class="federal-refs-actions">
+                                <button class="btn-primary" id="btn-download-federal" onclick="downloadFederalDocs()" style="display: none;">Скачать</button>
+                                <button class="btn-secondary" id="btn-skip-refs" onclick="skipFederalRefs()" style="display: none;">Игнорировать и продолжить</button>
+                                <button class="btn-success" id="btn-continue-all-found" onclick="continueAnalysisAfterRefs()" style="display: none;">Продолжить анализ</button>
+                                <button class="btn-success" id="btn-continue-analysis" onclick="continueAnalysisAfterRefs()" style="display: none;">Продолжить анализ</button>
+                                <button class="btn-success" id="btn-continue-after-failure" onclick="continueAnalysisAfterRefs()" style="display: none;">Продолжить</button>
+                                <button class="btn-danger" id="btn-cancel-refs" onclick="cancelAnalysis()" style="display: none;">Отменить</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Этап 1: предварительный анализ -->
+                    <div class="analysis-stage-panel" id="stage1-panel" style="display: none;">
+                        <div class="stage-header stage1-top-block">
+                            <h3>Этап 1. Предварительный анализ документа</h3>
+                            <p class="stage-subtitle">Уточните параметры организации перед правовым анализом</p>
+                            <div class="analiz-screen-hint">
+                                Проверьте или измените автоматически определённые параметры. Выберите сферу деятельности,
+                                форму собственности и области законодательства — от этого зависит глубина правовой проверки.
+                                Затем нажмите «Перейти к правовому анализу».
+                            </div>
+                        </div>
+                        <form id="stage1-form" class="stage1-form" onsubmit="return false;">
+                            <div class="stage1-form-grid">
+                                <div class="stage1-form-main">
+                                    <div class="stage1-field">
+                                        <label for="stage1-activity">1. Сфера деятельности предприятия</label>
+                                        <select id="stage1-activity" required></select>
+                                    </div>
+                                    <div class="stage1-field">
+                                        <label for="stage1-ownership">2. Форма собственности</label>
+                                        <select id="stage1-ownership" required></select>
+                                    </div>
+                                    <div class="stage1-field">
+                                        <label for="stage1-legal">3. Области законодательства для анализа</label>
+                                        <p class="stage1-hint">Удерживайте Ctrl для выбора нескольких областей</p>
+                                        <select id="stage1-legal" multiple size="4" required></select>
+                                    </div>
+                                </div>
+                                <div class="stage1-form-side">
+                                    <div class="stage1-field stage1-field-side">
+                                        <span class="stage1-field-label">4. Какие документы нижнего уровня ещё приняты в Вашей организации?</span>
+                                        <div class="stage1-checkbox-group" id="stage1-lower-level-docs">
+                                            <label class="stage1-checkbox-option">
+                                                <input type="checkbox" name="stage1-lower-level" value="provisions" />
+                                                Положения
+                                            </label>
+                                            <label class="stage1-checkbox-option">
+                                                <input type="checkbox" name="stage1-lower-level" value="regulations" />
+                                                Регламенты
+                                            </label>
+                                            <label class="stage1-checkbox-option">
+                                                <input type="checkbox" name="stage1-lower-level" value="appointment_orders" />
+                                                Приказы о назначении ответственных лиц
+                                            </label>
+                                            <label class="stage1-checkbox-option">
+                                                <input type="checkbox" name="stage1-lower-level" value="instructions" />
+                                                Инструкции
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="stage1-form-footer">
+                                <div id="stage1-detected-note" class="stage1-note"></div>
+                                <div class="stage1-form-actions">
+                                    <button type="button" class="btn-primary" id="btn-stage1-submit" onclick="submitStage1()">
+                                        Перейти к правовому анализу
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Этап 2: правовой анализ -->
+                    <div class="analysis-stage-panel" id="stage2-panel" style="display: none;">
+                        <div class="stage-header">
+                            <h3 id="stage2-title">Правовой анализ</h3>
+                        </div>
+                        <div class="analiz-screen-hint">
+                            Ниже — результат правовой проверки. Нажмите <strong>«Сохранить»</strong>, чтобы записать отчёт в подпапку OUT рабочей папки,
+                            или <strong>«Скачать»</strong> для копии на компьютер. После завершения нажмите «Завершить».
+                        </div>
+                        <div id="stage1-summary" class="stage1-summary"></div>
+                        <div id="analysis-result" class="analysis-result"></div>
+                        <div class="stage-footer-buttons">
+                            <button type="button" class="btn-success" id="btn-save-report" onclick="saveReportToWorkFolder()">Сохранить</button>
+                            <button type="button" class="btn-primary" id="btn-download-report" onclick="downloadReport()">⬇ Скачать отчёт (PDF)</button>
+                            <button type="button" class="btn-danger" onclick="finishAnalysis()">Завершить</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Правая колонка: незавершенные диалоги (не используется в новом анализе) -->
+                <div id="unfinished-dialogs" class="unfinished-dialogs" style="display: none;">
+                    <h3>Незавершенные диалоги</h3>
+                    <div id="dialogs-list"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>Разработчик: Алексей Ларионов</p>
+        </div>
+    </footer>
+
+    <div id="analiz-files-modal" class="analiz-modal" hidden aria-hidden="true">
+        <div class="analiz-modal-backdrop" data-close-analiz-modal></div>
+        <div class="analiz-modal-dialog" role="dialog" aria-labelledby="analiz-files-modal-title">
+            <div class="analiz-modal-header">
+                <h3 id="analiz-files-modal-title">Правила работы с файлами</h3>
+                <button type="button" class="analiz-modal-close" data-close-analiz-modal aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="analiz-modal-body">
+                <p>Чтобы анализ, переработка и поиск по ВНД работали согласованно, соблюдайте простые правила:</p>
+                <ul>
+                    <li><strong>Не переименовывайте</strong> основной документ и отчёт анализа после загрузки. Подбор связанных файлов выполняется по имени.</li>
+                    <li>Рабочая папка задаётся в <strong>config.cfg</strong> (⚙ Настройки на главном экране). По умолчанию: <strong>C:\WND\</strong>.</li>
+                    <li>Исходный ВНД храните в подпапке <strong>IN</strong> — туда попадает файл при загрузке в этом разделе.</li>
+                    <li>Отчёт анализа сохраняется в подпапку <strong>OUT</strong>. Его имя должно соответствовать документу.</li>
+                    <li>Федеральные акты загружаются в подпапку <strong>FZ</strong>, нормативные ГОСТ — в <strong>FZYur</strong>.</li>
+                    <li>Если планируете <strong>переработать документ</strong>, используйте согласованные имена файлов в IN и OUT.</li>
+                    <li>Для <strong>поиска и консультаций</strong> по ВНД можно выбрать документ из базы или загрузить файл с тем же именем.</li>
+                </ul>
+                <p class="analiz-modal-footer-note">
+                    Если файл был переименован или перемещён, автоматический подбор отчёта может не сработать — загрузите файлы заново с согласованными именами.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/errors.js"></script>
+    <script src="/static/config-ui.js?v=20260801"></script>
+    <script src="/static/downloads.js"></script>
+    <script src="/static/analiz.js?v=20260803"></script>
+</body>
+</html>

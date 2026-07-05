@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>НейроКонсультант по ВНД</title>
+    <link rel="stylesheet" href="/static/styles.css?v=20260801">
+</head>
+<body>
+    <!-- Шапка -->
+    <header class="header">
+        <div class="header-content">
+            <h1>НейроКонсультант по организационно-распорядительным документам</h1>
+            <button type="button" class="btn-settings" id="btn-app-settings" title="Настройки" aria-label="Настройки">⚙</button>
+        </div>
+    </header>
+
+    <!-- Основной контент -->
+    <main class="main-content">
+        <div class="menu-grid">
+            <!-- Квадрат 1: Анализ ВНД -->
+            <div class="menu-card" id="card-analiz" onclick="openAnalizPage()">
+                <div class="card-icon">📋</div>
+                <h2>Анализ ВНД</h2>
+                <p>Проверка внутренних нормативных документов на соответствие законодательству РФ</p>
+            </div>
+
+            <!-- Квадрат 2: Помощник в создании ВНД -->
+            <div class="menu-card" id="card-create" onclick="openCreatePage()">
+                <div class="card-icon">✏️</div>
+                <h2>Помощник в создании ВНД</h2>
+                <p>Помощь в создании внутренних нормативных документов</p>
+            </div>
+
+            <!-- Квадрат 3: Поиск в ВНД -->
+            <div class="menu-card" id="card-search" onclick="openSearchPage()">
+                <div class="card-icon">🔍</div>
+                <h2>Поиск в ВНД</h2>
+                <p>Поиск и консультации по внутренним нормативным документам</p>
+            </div>
+
+            <!-- Квадрат 4: Статистика -->
+            <div class="menu-card" id="card-stats">
+                <div class="card-icon">📊</div>
+                <h2>Статистика</h2>
+                <p>Информация о готовности баз данных</p>
+            </div>
+        </div>
+    </main>
+
+    <!-- Подвал -->
+    <footer class="footer">
+        <div class="footer-content">
+            <p>Разработчик: Алексей Ларионов</p>
+        </div>
+    </footer>
+
+    <div id="app-settings-modal" class="app-settings-modal" hidden aria-hidden="true">
+        <div class="app-settings-backdrop" data-close-settings></div>
+        <div class="app-settings-dialog" role="dialog" aria-labelledby="app-settings-title">
+            <div class="app-settings-header">
+                <h3 id="app-settings-title">Настройки конфигурации Нейро консультанта</h3>
+                <button type="button" class="app-settings-close" data-close-settings aria-label="Закрыть">&times;</button>
+            </div>
+            <div class="app-settings-body">
+                <label class="app-settings-label" for="settings-work-folder">Рабочая папка</label>
+                <div class="app-settings-path-row">
+                    <input type="text" id="settings-work-folder" class="app-settings-input" placeholder="C:\WND" autocomplete="off" />
+                    <button type="button" class="btn-secondary btn-settings-browse" id="btn-settings-browse" title="Выбрать папку">Обзор…</button>
+                </div>
+                <p class="app-settings-hint">Укажите полный путь или нажмите «Обзор…». При сохранении будут созданы подпапки ниже.</p>
+
+                <h4 class="app-settings-subtitle">Папки для сохранения</h4>
+                <div id="settings-folder-list" class="config-folder-list"></div>
+
+                <div class="app-settings-actions">
+                    <button type="button" class="btn-primary" id="btn-settings-save">Сохранить</button>
+                    <button type="button" class="btn-secondary" id="btn-settings-default">Установить по умолчанию</button>
+                    <button type="button" class="btn-secondary" data-close-settings>Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="stats-docs-modal" class="stats-modal" hidden aria-hidden="true">
+        <div class="stats-modal-backdrop" data-close-modal></div>
+        <div class="stats-modal-dialog" role="dialog" aria-labelledby="stats-modal-title">
+            <div class="stats-modal-header">
+                <h3 id="stats-modal-title">Документы</h3>
+                <button type="button" class="stats-modal-close" data-close-modal aria-label="Закрыть">&times;</button>
+            </div>
+            <div id="stats-modal-body" class="stats-modal-body"></div>
+        </div>
+    </div>
+
+    <script src="/static/errors.js"></script>
+    <script src="/static/config-ui.js?v=20260802"></script>
+    <script src="/static/app.js?v=20260801"></script>
+</body>
+</html>
+
+
+
