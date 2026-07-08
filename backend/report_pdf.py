@@ -38,14 +38,10 @@ _PREVIEW = {
 _EMOJI_FONT_CANDIDATES = (
     "C:/Windows/Fonts/seguiemj.ttf",
     "C:/Windows/Fonts/NotoColorEmoji.ttf",
+    "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",
+    "/usr/share/fonts/google-noto-emoji/NotoColorEmoji.ttf",
+    "/usr/share/fonts/noto/NotoColorEmoji.ttf",
 )
-
-_EMOJI_RE = re.compile(
-    r"(?:\d\uFE0F?\u20E3)"
-    r"|(?:[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F600-\U0001F64F"
-    r"\u2705\u274C\u26A0\u2139\u2696\u2699\u2695\u2694\u26D4\u2B50]+(?:\uFE0F)?)"
-)
-
 
 _EMOJI_TEXT_FALLBACKS = {
     "✅": "[OK]",
@@ -58,7 +54,38 @@ _EMOJI_TEXT_FALLBACKS = {
     "ℹ️": "[инфо]",
     "ℹ": "[инфо]",
     "🚨": "[!]",
+    "💰": "",
+    "⚖️": "",
+    "⚖": "",
+    "📋": "",
+    "📄": "",
+    "📊": "",
+    "📅": "",
+    "📌": "",
+    "🔗": "",
+    "⚡": "",
+    "🧾": "",
+    "🧱": "",
+    "📚": "",
+    "🏦": "",
+    "🔟": "10.",
+    "9️⃣": "9.",
+    "8️⃣": "8.",
+    "7️⃣": "7.",
+    "6️⃣": "6.",
+    "5️⃣": "5.",
+    "4️⃣": "4.",
+    "3️⃣": "3.",
+    "2️⃣": "2.",
+    "1️⃣": "1.",
 }
+
+
+_EMOJI_RE = re.compile(
+    r"(?:\d\uFE0F?\u20E3)"
+    r"|(?:[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F600-\U0001F64F"
+    r"\u2705\u274C\u26A0\u2139\u2696\u2699\u2695\u2694\u26D4\u2B50]+(?:\uFE0F)?)"
+)
 
 
 class _EmojiImageCache:
@@ -69,7 +96,7 @@ class _EmojiImageCache:
         self._font_path = next((p for p in _EMOJI_FONT_CANDIDATES if os.path.exists(p)), "")
         self.enabled = bool(self._font_path)
         self._cache_dir = os.path.join(
-            os.environ.get("TEMP", os.environ.get("TMP", ".")),
+            os.environ.get("TEMP", os.environ.get("TMP", "/tmp")),
             "wnd_report_emoji",
         )
 
@@ -105,7 +132,9 @@ class _EmojiImageCache:
         size = _PREVIEW["emoji_icon_pt"]
         if path:
             return f'<img src="{path}" width="{size}" height="{size}" valign="middle"/>'
-        return escape(_EMOJI_TEXT_FALLBACKS.get(emoji, ""))
+        if emoji in _EMOJI_TEXT_FALLBACKS:
+            return escape(_EMOJI_TEXT_FALLBACKS[emoji])
+        return escape(_normalize_symbols_for_plaintext(emoji))
 
 
 _EMOJI_CACHE = _EmojiImageCache()
@@ -194,11 +223,7 @@ def _register_report_fonts() -> Tuple[str, str]:
     regular = "ReportFont"
     bold = "ReportFontBold"
 
-    candidates = [
-        ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf"),
-        ("C:/Windows/Fonts/calibri.ttf", "C:/Windows/Fonts/calibrib.ttf"),
-        ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
-    ]
+    candidates: List[Tuple[str, str]] = []
 
     try:
         import reportlab
@@ -213,16 +238,32 @@ def _register_report_fonts() -> Tuple[str, str]:
     except Exception:
         pass
 
+    project_fonts = os.path.join(os.path.dirname(__file__), "fonts")
+    candidates.extend(
+        [
+            (os.path.join(project_fonts, "DejaVuSans.ttf"), os.path.join(project_fonts, "DejaVuSans-Bold.ttf")),
+            ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+            ("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf"),
+            ("/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf", "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf"),
+            ("C:/Windows/Fonts/segoeui.ttf", "C:/Windows/Fonts/segoeuib.ttf"),
+            ("C:/Windows/Fonts/arial.ttf", "C:/Windows/Fonts/arialbd.ttf"),
+        ]
+    )
+
     registered_regular = False
     registered_bold = False
     for reg_path, bold_path in candidates:
-        if os.path.exists(reg_path):
+        if not os.path.exists(reg_path):
+            continue
+        try:
             pdfmetrics.registerFont(TTFont(regular, reg_path))
             registered_regular = True
             if os.path.exists(bold_path):
                 pdfmetrics.registerFont(TTFont(bold, bold_path))
                 registered_bold = True
             break
+        except Exception:
+            continue
 
     if not registered_regular:
         regular = "Helvetica"
