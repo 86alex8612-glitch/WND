@@ -660,6 +660,15 @@ class BrowseFolderRequest(BaseModel):
     initial_path: Optional[str] = ""
 
 
+UPLOAD_TARGET_FOLDERS = {
+    "IN": "in_folder",
+    "FZYur": "fzyur_folder",
+    "FZ": "fz_folder",
+    "OUT": "out_folder",
+    "new-doc": "new_doc_folder",
+}
+
+
 @app.get("/api/vnd/latest-file")
 async def get_latest_vnd_file():
     """Получить имя последнего загруженного ВНД из папки IN."""
@@ -1312,11 +1321,21 @@ async def reset_app_config():
 
 @app.post("/api/config/browse-folder")
 async def browse_app_folder(request: BrowseFolderRequest):
-    """Открыть диалог выбора папки на компьютере пользователя."""
+    """Открыть диалог выбора папки (только Windows с GUI)."""
     import asyncio
 
     try:
-        from path_config import browse_folder_dialog, read_work_folder
+        from path_config import browse_folder_dialog, read_work_folder, is_browse_folder_available
+
+        if not is_browse_folder_available():
+            return {
+                "status": "unavailable",
+                "path": None,
+                "message": (
+                    "На сервере Linux диалог выбора папки недоступен. "
+                    "Введите путь вручную, например: /home/ваш_логин/wnd"
+                ),
+            }
 
         initial = (request.initial_path or "").strip() or read_work_folder()
         selected = await asyncio.to_thread(browse_folder_dialog, initial)
@@ -1325,6 +1344,83 @@ async def browse_app_folder(request: BrowseFolderRequest):
         return {"status": "success", "path": selected}
     except Exception as e:
         raise HTTPException(status_code=500, detail=http_detail(e, "init"))
+
+
+def _safe_relative_upload_path(filename: str) -> str:
+    """Сохраняем структуру папки из браузера, но не позволяем выйти из target."""
+    from pathlib import PurePosixPath
+
+    raw = (filename or "").replace("\\", "/").strip()
+    parts = []
+    for part in PurePosixPath(raw).parts:
+        clean = re.sub(r'[<>:"\\|?*\x00-\x1f]', "_", part).strip()
+        if not clean or clean in {".", ".."}:
+            continue
+        parts.append(clean)
+    if not parts:
+        return f"upload_{int(time.time() * 1000)}"
+    return "/".join(parts)
+
+
+@app.post("/api/config/upload-files")
+async def upload_config_files(
+    target_folder: str = Query("IN"),
+    files: list[UploadFile] = File(...),
+):
+    """Загрузить файлы/папку с ПК пользователя в выбранную рабочую подпапку сервера."""
+    try:
+        from pathlib import Path
+
+        from path_config import apply_paths_to_settings
+
+        target_key = (target_folder or "").strip()
+        if target_key not in UPLOAD_TARGET_FOLDERS:
+            raise HTTPException(
+                status_code=400,
+                detail="Неизвестная папка назначения. Допустимо: IN, FZYur, FZ, OUT, new-doc",
+            )
+
+        paths = apply_paths_to_settings()
+        base_dir = Path(paths[UPLOAD_TARGET_FOLDERS[target_key]]).resolve()
+        base_dir.mkdir(parents=True, exist_ok=True)
+
+        saved_files = []
+        skipped = 0
+        for file in files:
+            if not file or not file.filename:
+                skipped += 1
+                continue
+
+            relative_name = _safe_relative_upload_path(file.filename)
+            destination = (base_dir / relative_name).resolve()
+            if base_dir not in destination.parents and destination != base_dir:
+                skipped += 1
+                continue
+
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            content = await file.read()
+            if not content:
+                skipped += 1
+                continue
+            destination.write_bytes(content)
+            saved_files.append(str(destination))
+
+        if not saved_files:
+            raise HTTPException(status_code=400, detail="Файлы не выбраны или пустые")
+
+        return {
+            "status": "success",
+            "target_folder": target_key,
+            "folder": str(base_dir),
+            "saved_count": len(saved_files),
+            "skipped_count": skipped,
+            "files": saved_files[:100],
+            "message": f"Загружено файлов: {len(saved_files)} в {target_key}",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=http_detail(e, "upload"))
 
 
 @app.get("/api/bases/status")
