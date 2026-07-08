@@ -68,10 +68,31 @@
                     <input type="text" id="settings-work-folder" class="app-settings-input" placeholder="C:\WND" autocomplete="off" />
                     <button type="button" class="btn-secondary btn-settings-browse" id="btn-settings-browse" title="Выбрать папку">Обзор…</button>
                 </div>
-                <p class="app-settings-hint">Укажите полный путь или нажмите «Обзор…». При сохранении будут созданы подпапки ниже.</p>
+                <p class="app-settings-hint">Укажите полный путь или нажмите «Обзор…» (только на Windows). При сохранении будут созданы подпапки ниже.</p>
+                <p class="app-settings-hint app-settings-browse-hint" id="settings-browse-hint" hidden></p>
 
                 <h4 class="app-settings-subtitle">Папки для сохранения</h4>
                 <div id="settings-folder-list" class="config-folder-list"></div>
+
+                <h4 class="app-settings-subtitle">Загрузка файлов с вашего ПК</h4>
+                <div class="settings-upload-panel">
+                    <label class="app-settings-label" for="settings-upload-target">Куда загрузить</label>
+                    <select id="settings-upload-target" class="app-settings-input">
+                        <option value="IN">IN — входящие документы ВНД</option>
+                        <option value="FZYur">FZYur — ГОСТ и стандарты</option>
+                        <option value="FZ">FZ — федеральные законы</option>
+                        <option value="OUT">OUT — отчёты и результаты</option>
+                        <option value="new-doc">new-doc — проекты новых ВНД</option>
+                    </select>
+                    <p class="app-settings-hint">Этот «Обзор» работает через браузер: выбирает файлы или папку на вашем ПК и загружает их на сервер в выбранную подпапку.</p>
+                    <div class="settings-upload-actions">
+                        <button type="button" class="btn-secondary" id="btn-settings-upload-files">Выбрать файлы…</button>
+                        <button type="button" class="btn-secondary" id="btn-settings-upload-folder">Выбрать папку…</button>
+                    </div>
+                    <input type="file" id="settings-upload-files-input" multiple hidden />
+                    <input type="file" id="settings-upload-folder-input" webkitdirectory directory multiple hidden />
+                    <div id="settings-upload-status" class="settings-upload-status" hidden></div>
+                </div>
 
                 <div class="app-settings-actions">
                     <button type="button" class="btn-primary" id="btn-settings-save">Сохранить</button>
@@ -94,7 +115,7 @@
     </div>
 
     <script src="/static/errors.js"></script>
-    <script src="/static/config-ui.js?v=20260802"></script>
+    <script src="/static/config-ui.js?v=20260708"></script>
     <script src="/static/app.js?v=20260801"></script>
 </body>
 </html>

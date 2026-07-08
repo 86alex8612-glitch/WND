@@ -38,9 +38,10 @@ function buildPreviewFolders(config, workFolderOverride) {
     if (!root) {
         return template;
     }
+    const separator = root.includes('\\') && !root.includes('/') ? '\\' : '/';
     return template.map((item) => ({
         ...item,
-        path: `${root}\\${item.name}`,
+        path: `${root}${separator}${item.name}`,
     }));
 }
 
@@ -67,6 +68,25 @@ function refreshSettingsFolderPreview() {
     const container = document.getElementById('settings-folder-list');
     if (!appConfigCache || !container) return;
     renderConfigFolderList(container, appConfigCache, input?.value?.trim() || '');
+}
+
+function applyBrowseAvailability(config) {
+    const browseBtn = document.getElementById('btn-settings-browse');
+    const hint = document.getElementById('settings-browse-hint');
+    const available = config?.browse_folder_available !== false;
+
+    if (browseBtn) {
+        browseBtn.disabled = !available;
+        browseBtn.title = available
+            ? 'Выбрать папку на этом компьютере'
+            : (config?.browse_folder_hint || 'На сервере укажите путь вручную');
+    }
+
+    if (hint) {
+        const text = config?.browse_folder_hint || '';
+        hint.textContent = text;
+        hint.hidden = !text || available;
+    }
 }
 
 function escapeConfigHtml(text) {
@@ -109,6 +129,22 @@ function bindSettingsModalHandlers() {
     document.getElementById('btn-settings-default')?.addEventListener('click', resetSettingsToDefault);
     document.getElementById('btn-settings-browse')?.addEventListener('click', browseWorkFolderFromModal);
     document.getElementById('settings-work-folder')?.addEventListener('input', refreshSettingsFolderPreview);
+    document.getElementById('btn-settings-upload-files')?.addEventListener('click', () => {
+        document.getElementById('settings-upload-files-input')?.click();
+    });
+    document.getElementById('btn-settings-upload-folder')?.addEventListener('click', () => {
+        document.getElementById('settings-upload-folder-input')?.click();
+    });
+    document.getElementById('settings-upload-files-input')?.addEventListener('change', (event) => {
+        uploadSettingsFiles(event.target.files, false).finally(() => {
+            event.target.value = '';
+        });
+    });
+    document.getElementById('settings-upload-folder-input')?.addEventListener('change', (event) => {
+        uploadSettingsFiles(event.target.files, true).finally(() => {
+            event.target.value = '';
+        });
+    });
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && modal && !modal.hidden) {
@@ -128,6 +164,7 @@ function openSettingsModal() {
                 input.value = config.work_folder || config.default_work_folder || 'C:\\WND';
             }
             renderConfigFolderList(document.getElementById('settings-folder-list'), config);
+            applyBrowseAvailability(config);
             modal.hidden = false;
             modal.setAttribute('aria-hidden', 'false');
         })
@@ -159,6 +196,10 @@ async function browseWorkFolderFromModal() {
             { initial_path: initialPath },
             'Не удалось открыть выбор папки',
         );
+        if (result.status === 'unavailable') {
+            alert(result.message || 'На сервере выбор папки через диалог недоступен. Введите путь вручную.');
+            return;
+        }
         if (result.status === 'cancelled' || !result.path) {
             return;
         }
@@ -173,6 +214,59 @@ async function browseWorkFolderFromModal() {
             browseBtn.disabled = false;
             browseBtn.textContent = 'Обзор…';
         }
+    }
+}
+
+function setSettingsUploadStatus(message, type = 'info') {
+    const status = document.getElementById('settings-upload-status');
+    if (!status) return;
+    status.hidden = !message;
+    status.textContent = message || '';
+    status.className = `settings-upload-status settings-upload-status-${type}`;
+}
+
+async function uploadSettingsFiles(fileList, preserveRelativePath) {
+    const files = Array.from(fileList || []);
+    if (!files.length) return;
+
+    const target = document.getElementById('settings-upload-target')?.value || 'IN';
+    const formData = new FormData();
+    for (const file of files) {
+        const uploadName = preserveRelativePath && file.webkitRelativePath
+            ? file.webkitRelativePath
+            : file.name;
+        formData.append('files', file, uploadName);
+    }
+
+    const buttons = [
+        document.getElementById('btn-settings-upload-files'),
+        document.getElementById('btn-settings-upload-folder'),
+    ].filter(Boolean);
+    buttons.forEach((button) => { button.disabled = true; });
+    setSettingsUploadStatus(`Загрузка файлов: ${files.length}...`, 'info');
+
+    try {
+        const response = await fetch(
+            `${getConfigApiBase()}/api/config/upload-files?target_folder=${encodeURIComponent(target)}`,
+            {
+                method: 'POST',
+                body: formData,
+            },
+        );
+        if (!response.ok) {
+            throw new Error(await readApiError(response, 'Не удалось загрузить файлы'));
+        }
+        const result = await response.json();
+        setSettingsUploadStatus(result.message || `Загружено файлов: ${result.saved_count || files.length}`, 'success');
+        await fetchAppConfig(true).then((config) => {
+            appConfigCache = config;
+            renderConfigFolderList(document.getElementById('settings-folder-list'), config);
+            applyBrowseAvailability(config);
+        });
+    } catch (error) {
+        setSettingsUploadStatus(formatCaughtError(error, 'Не удалось загрузить файлы'), 'error');
+    } finally {
+        buttons.forEach((button) => { button.disabled = false; });
     }
 }
 
@@ -192,6 +286,7 @@ async function saveSettingsFromModal() {
         );
         appConfigCache = result;
         renderConfigFolderList(document.getElementById('settings-folder-list'), result);
+        applyBrowseAvailability(result);
         alert('✅ ' + (result.message || 'Настройки сохранены'));
     } catch (error) {
         alert('❌ ' + formatCaughtError(error, 'Не удалось сохранить настройки'));
@@ -211,6 +306,7 @@ async function resetSettingsToDefault() {
             input.value = result.work_folder || result.default_work_folder || 'C:\\WND';
         }
         renderConfigFolderList(document.getElementById('settings-folder-list'), result);
+        applyBrowseAvailability(result);
         alert('✅ ' + (result.message || 'Установлены настройки по умолчанию'));
     } catch (error) {
         alert('❌ ' + formatCaughtError(error, 'Не удалось восстановить настройки'));

@@ -243,10 +243,59 @@ body {
     word-break: break-all;
 }
 
+.app-settings-browse-hint {
+    color: #856404;
+    background: #fff3cd;
+    border: 1px solid #ffeeba;
+    border-radius: 4px;
+    padding: 6px 8px;
+}
+
 .config-folders-empty {
     margin: 0;
     font-size: 0.8rem;
     color: #6c757d;
+}
+
+.settings-upload-panel {
+    margin: 4px 0 14px;
+    padding: 10px;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    background: #fbfbfc;
+}
+
+.settings-upload-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.settings-upload-status {
+    margin-top: 8px;
+    padding: 7px 9px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.settings-upload-status-info {
+    color: #084298;
+    background: #cfe2ff;
+    border: 1px solid #b6d4fe;
+}
+
+.settings-upload-status-success {
+    color: #0f5132;
+    background: #d1e7dd;
+    border: 1px solid #badbcc;
+}
+
+.settings-upload-status-error {
+    color: #842029;
+    background: #f8d7da;
+    border: 1px solid #f5c2c7;
 }
 
 .app-settings-actions {
