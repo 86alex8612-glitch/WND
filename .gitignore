@@ -33,17 +33,11 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.temp
+*.zip
+*.7z
+*.rar
 
-# Рабочие данные (структура каталогов хранится в репозитории)
-logs/
-IN/*
-!IN/.gitkeep
-OUT/*
-!OUT/.gitkeep
-FZ/*
-!FZ/.gitkeep
-FZYur/*
-!FZYur/.gitkeep
-new-doc/*
-!new-doc/.gitkeep
+
+
+
 
