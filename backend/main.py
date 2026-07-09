@@ -87,7 +87,7 @@ async def startup_event():
     try:
         from path_config import apply_paths_to_settings
         paths = apply_paths_to_settings()
-        print(f"Пути из config.cfg: {paths.get('work_folder')}")
+        print(f"Пути из config: {paths.get('data_root')}")
     except Exception as e:
         print(f"⚠️  Ошибка загрузки config.cfg: {e}")
 
@@ -438,83 +438,11 @@ def _file_download_response(content: bytes, filename: str, media_type: str) -> R
 async def upload_vnd(file: UploadFile = File(...)):
     """Загрузить ВНД для анализа"""
     try:
-        # Проверяем, что файл выбран
         if not file.filename:
             raise HTTPException(status_code=400, detail="Файл не выбран")
 
         content = await file.read()
-        from federal_refs import clear_session_federal_refs_result
-        clear_session_federal_refs_result()
-
-        file_path, saved_filename, save_warning = _save_uploaded_file(
-            settings.in_folder,
-            file.filename,
-            content,
-        )
-
-        print(f"Файл сохранен: {file_path}")
-        if save_warning:
-            print(f"Предупреждение при сохранении: {save_warning}")
-        
-        # Обрабатываем файл и добавляем в векторную базу
-        from vector_store import vnd_store, init_vector_stores
-        
-        # Убеждаемся, что векторные базы инициализированы
-        if not vnd_store:
-            print("Векторная база не инициализирована, инициализируем...")
-            init_vector_stores()
-            from vector_store import vnd_store as vnd_store_check
-            if not vnd_store_check:
-                print("Ошибка: не удалось инициализировать векторную базу ВНД")
-                return {
-                    "message": "Файл загружен, но векторная база не инициализирована",
-                    "filename": saved_filename,
-                    "result": {
-                        "status": "error",
-                        "message": "Векторная база ВНД не инициализирована. Файл сохранен, но не обработан.",
-                        "files_processed": 0,
-                        "total_chunks": 0
-                    }
-                }
-            vnd_store = vnd_store_check
-        
-        print(f"Векторная база готова: {vnd_store is not None}")
-        
-        # Обрабатываем только загруженный файл
-        from document_loader import process_single_file
-        print(f"Начинаем обработку файла: {file_path}")
-        print(f"Векторная база ВНД готова: {vnd_store is not None}")
-        
-        # Проверяем состояние базы до обработки
-        try:
-            before_count = vnd_store.get_collection_info()["count"]
-            print(f"Документов в базе ВНД до обработки: {before_count}")
-        except:
-            before_count = 0
-        
-        result = process_single_file(file_path, vnd_store, "vnd")
-        print(f"Обработка завершена. Результат: {result}")
-        
-        # Проверяем состояние базы после обработки
-        try:
-            after_count = vnd_store.get_collection_info()["count"]
-            print(f"Документов в базе ВНД после обработки: {after_count}")
-            if after_count > before_count:
-                print(f"✓ Документ успешно добавлен в базу ВНД (+{after_count - before_count} фрагментов)")
-            else:
-                print(f"⚠️  Внимание: количество документов не изменилось")
-        except Exception as e:
-            print(f"⚠️  Не удалось проверить состояние базы: {e}")
-        
-        print(f"Результат обработки файла: {result}")
-        
-        return {
-            "message": "Файл загружен и обработан",
-            "filename": saved_filename,
-            "file_path": file_path,
-            "warning": save_warning,
-            "result": result
-        }
+        return _handle_vnd_upload(file.filename, content)
     except HTTPException:
         raise
     except PermissionError:
@@ -543,6 +471,147 @@ async def upload_vnd(file: UploadFile = File(...)):
                     "(часто Adobe Acrobat). Закройте PDF и повторите загрузку."
                 ),
             )
+        raise HTTPException(status_code=500, detail=http_detail(e, "upload"))
+
+
+def _handle_vnd_upload(original_filename: str, content: bytes) -> dict:
+    from federal_refs import clear_session_federal_refs_result
+
+    clear_session_federal_refs_result()
+
+    file_path, saved_filename, save_warning = _save_uploaded_file(
+        settings.in_folder,
+        original_filename,
+        content,
+    )
+
+    print(f"Файл сохранен: {file_path}")
+    if save_warning:
+        print(f"Предупреждение при сохранении: {save_warning}")
+
+    from vector_store import vnd_store, init_vector_stores
+
+    if not vnd_store:
+        print("Векторная база не инициализирована, инициализируем...")
+        init_vector_stores()
+        from vector_store import vnd_store as vnd_store_check
+        if not vnd_store_check:
+            print("Ошибка: не удалось инициализировать векторную базу ВНД")
+            return {
+                "message": "Файл загружен, но векторная база не инициализирована",
+                "filename": saved_filename,
+                "result": {
+                    "status": "error",
+                    "message": "Векторная база ВНД не инициализирована. Файл сохранен, но не обработан.",
+                    "files_processed": 0,
+                    "total_chunks": 0,
+                },
+            }
+        vnd_store = vnd_store_check
+
+    print(f"Векторная база готова: {vnd_store is not None}")
+
+    from document_loader import process_single_file
+
+    print(f"Начинаем обработку файла: {file_path}")
+    print(f"Векторная база ВНД готова: {vnd_store is not None}")
+
+    try:
+        before_count = vnd_store.get_collection_info()["count"]
+        print(f"Документов в базе ВНД до обработки: {before_count}")
+    except Exception:
+        before_count = 0
+
+    result = process_single_file(file_path, vnd_store, "vnd")
+    print(f"Обработка завершена. Результат: {result}")
+
+    try:
+        after_count = vnd_store.get_collection_info()["count"]
+        print(f"Документов в базе ВНД после обработки: {after_count}")
+        if after_count > before_count:
+            print(f"✓ Документ успешно добавлен в базу ВНД (+{after_count - before_count} фрагментов)")
+        else:
+            print("⚠️  Внимание: количество документов не изменилось")
+    except Exception as e:
+        print(f"⚠️  Не удалось проверить состояние базы: {e}")
+
+    print(f"Результат обработки файла: {result}")
+
+    return {
+        "message": "Файл загружен и обработан",
+        "filename": saved_filename,
+        "file_path": file_path,
+        "warning": save_warning,
+        "result": result,
+    }
+
+
+def _tkinter_browse_vnd_file(initial_dir: str) -> Optional[str]:
+    try:
+        import tkinter as tk
+        from tkinter import filedialog
+    except ImportError:
+        return None
+
+    root = tk.Tk()
+    root.withdraw()
+    try:
+        root.attributes("-topmost", True)
+    except Exception:
+        pass
+    selected = filedialog.askopenfilename(
+        parent=root,
+        initialdir=initial_dir,
+        title="Выберите документ ВНД",
+        filetypes=[
+            ("Документы ВНД", "*.pdf *.docx *.doc *.txt"),
+            ("Все файлы", "*.*"),
+        ],
+    )
+    root.destroy()
+    return selected or None
+
+
+@app.post("/api/files/browse-vnd")
+async def browse_vnd_file():
+    """Локальный Windows: диалог выбора файла, стартовая папка IN."""
+    if os.name != "nt":
+        raise HTTPException(
+            status_code=501,
+            detail="Диалог выбора файла доступен только на локальном Windows",
+        )
+
+    try:
+        from pathlib import Path
+        import asyncio
+
+        from path_config import apply_paths_to_settings
+
+        paths = apply_paths_to_settings()
+        initial_dir = paths["in_folder"]
+        Path(initial_dir).mkdir(parents=True, exist_ok=True)
+
+        selected = await asyncio.to_thread(_tkinter_browse_vnd_file, initial_dir)
+        if not selected:
+            return {"cancelled": True}
+
+        with open(selected, "rb") as handle:
+            content = handle.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Выбранный файл пустой")
+
+        return _handle_vnd_upload(os.path.basename(selected), content)
+    except HTTPException:
+        raise
+    except PermissionError:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Не удалось прочитать файл: он открыт в другой программе. "
+                "Закройте файл и повторите выбор."
+            ),
+        )
+    except Exception as e:
         raise HTTPException(status_code=500, detail=http_detail(e, "upload"))
 
 
@@ -657,7 +726,7 @@ class WorkFolderRequest(BaseModel):
 
 
 class BrowseFolderRequest(BaseModel):
-    initial_path: Optional[str] = ""
+    initial_dir: Optional[str] = ""
 
 
 UPLOAD_TARGET_FOLDERS = {
@@ -1277,7 +1346,7 @@ def _get_base_documents_payload(base_name: str) -> dict:
 
 @app.get("/api/config")
 async def get_app_config():
-    """Текущие пути из config.cfg."""
+    """Текущие пути данных."""
     try:
         from path_config import get_config_payload
         return get_config_payload()
@@ -1287,61 +1356,75 @@ async def get_app_config():
 
 @app.post("/api/config/save")
 async def save_app_config(request: WorkFolderRequest):
-    """Сохранить рабочую папку в config.cfg и создать подпапки."""
+    """Сохранить рабочую папку и создать необходимые подпапки."""
     try:
-        from path_config import write_work_folder, apply_paths_to_settings, get_config_payload
+        import asyncio
 
-        write_work_folder(request.work_folder)
+        from path_config import apply_paths_to_settings, get_config_payload, write_data_root
+
+        paths = await asyncio.to_thread(write_data_root, request.work_folder)
         apply_paths_to_settings()
+        payload = get_config_payload()
         return {
             "status": "success",
-            "message": "Настройки сохранены. Папки созданы при необходимости.",
-            **get_config_payload(),
+            "message": f"Рабочая папка сохранена: {paths['data_root']}",
+            "paths": paths,
+            **payload,
         }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=http_detail(e, "init"))
 
 
 @app.post("/api/config/default")
 async def reset_app_config():
-    """Восстановить пути по умолчанию (C:\\WND)."""
+    """Сбросить рабочую папку к значению по умолчанию."""
     try:
-        from path_config import reset_to_defaults, apply_paths_to_settings, get_config_payload
+        import asyncio
 
-        reset_to_defaults()
+        from path_config import apply_paths_to_settings, get_config_payload, reset_data_root_to_default
+
+        paths = await asyncio.to_thread(reset_data_root_to_default)
         apply_paths_to_settings()
+        payload = get_config_payload()
         return {
             "status": "success",
-            "message": "Установлены настройки по умолчанию.",
-            **get_config_payload(),
+            "message": f"Установлена папка по умолчанию: {paths['data_root']}",
+            "paths": paths,
+            **payload,
         }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=http_detail(e, "init"))
 
 
 @app.post("/api/config/browse-folder")
 async def browse_app_folder(request: BrowseFolderRequest):
-    """Открыть диалог выбора папки (только Windows с GUI)."""
+    """Открыть диалог выбора папки (только локальный Windows)."""
     import asyncio
 
     try:
-        from path_config import browse_folder_dialog, read_work_folder, is_browse_folder_available
+        from path_config import browse_folder_dialog, is_browse_folder_available, read_data_root
 
         if not is_browse_folder_available():
             return {
-                "status": "unavailable",
-                "path": None,
-                "message": (
-                    "На сервере Linux диалог выбора папки недоступен. "
-                    "Введите путь вручную, например: /home/ваш_логин/wnd"
-                ),
+                "available": False,
+                "cancelled": True,
+                "message": "Диалог выбора папки доступен только на локальном Windows",
             }
 
-        initial = (request.initial_path or "").strip() or read_work_folder()
+        initial = (request.initial_dir or "").strip() or read_data_root()
         selected = await asyncio.to_thread(browse_folder_dialog, initial)
         if not selected:
-            return {"status": "cancelled", "path": None}
-        return {"status": "success", "path": selected}
+            return {"available": True, "cancelled": True}
+
+        return {
+            "available": True,
+            "cancelled": False,
+            "work_folder": selected,
+        }
     except Exception as e:
         raise HTTPException(status_code=500, detail=http_detail(e, "init"))
 
@@ -1408,6 +1491,32 @@ async def upload_config_files(
         if not saved_files:
             raise HTTPException(status_code=400, detail="Файлы не выбраны или пустые")
 
+        reindex_message = ""
+        if target_key == "FZYur":
+            try:
+                from document_loader import process_folder
+                import vector_store
+
+                vector_store.init_vector_stores()
+                if vector_store.gost_store:
+                    result = process_folder(str(base_dir), vector_store.gost_store, "gost")
+                    count = result.get("files_processed", 0)
+                    reindex_message = f"База ГОСТ обновлена: {count} файл(ов)."
+            except Exception as exc:
+                reindex_message = f"Файлы загружены, но индексация ГОСТ не выполнена: {exc}"
+        elif target_key == "FZ":
+            try:
+                from document_loader import process_folder
+                import vector_store
+
+                vector_store.init_vector_stores()
+                if vector_store.fz_store:
+                    result = process_folder(str(base_dir), vector_store.fz_store, "fz")
+                    count = result.get("files_processed", 0)
+                    reindex_message = f"База ФЗ обновлена: {count} файл(ов)."
+            except Exception as exc:
+                reindex_message = f"Файлы загружены, но индексация ФЗ не выполнена: {exc}"
+
         return {
             "status": "success",
             "target_folder": target_key,
@@ -1415,6 +1524,7 @@ async def upload_config_files(
             "saved_count": len(saved_files),
             "skipped_count": skipped,
             "files": saved_files[:100],
+            "reindex_message": reindex_message,
             "message": f"Загружено файлов: {len(saved_files)} в {target_key}",
         }
     except HTTPException:

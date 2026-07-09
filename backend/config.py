@@ -47,7 +47,7 @@ settings = Settings()
 try:
     from path_config import apply_paths_to_settings
     _resolved_paths = apply_paths_to_settings()
-    print(f"Рабочая папка: {_resolved_paths.get('work_folder')}")
+    print(f"Папка данных: {_resolved_paths.get('data_root')}")
 except Exception as exc:
     print(f"⚠️  Не удалось загрузить config.cfg: {exc}")
 
