@@ -3,10 +3,11 @@ from dotenv import load_dotenv
 import os
 from pathlib import Path
 
-load_dotenv()
-
 # Определяем корневую директорию проекта (родительская от backend)
 BASE_DIR = Path(__file__).parent.parent.resolve()
+ENV_FILE = BASE_DIR / ".env"
+
+load_dotenv(ENV_FILE)
 
 # Путь к базе данных SQLite (по умолчанию)
 DEFAULT_DB_PATH = BASE_DIR / "backend" / "wnd.db"
@@ -40,7 +41,7 @@ class Settings(BaseSettings):
     new_doc_folder: str = str(BASE_DIR / "new-doc")
     
     class Config:
-        env_file = ".env"
+        env_file = str(ENV_FILE)
 
 settings = Settings()
 

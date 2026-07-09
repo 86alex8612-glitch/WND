@@ -416,13 +416,14 @@ body {
 }
 
 .stat-base-upload {
-    font-size: 0.72rem;
-    padding: 4px 8px;
+    font-size: 0.68rem;
+    padding: 4px 6px;
     border: 1px solid #ced4da;
     border-radius: 4px;
     background: #fff;
     color: #333;
     cursor: pointer;
+    white-space: nowrap;
 }
 
 .stat-base-upload:hover {

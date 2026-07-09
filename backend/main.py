@@ -87,7 +87,8 @@ async def startup_event():
     try:
         from path_config import apply_paths_to_settings
         paths = apply_paths_to_settings()
-        print(f"Пути из config: {paths.get('data_root')}")
+        print(f"Папка данных: {paths.get('data_root')}")
+        print(f"ГОСТ (FZYur): {paths.get('fzyur_folder')}")
     except Exception as e:
         print(f"⚠️  Ошибка загрузки config.cfg: {e}")
 
@@ -1348,9 +1349,13 @@ def _get_base_documents_payload(base_name: str) -> dict:
 async def get_app_config():
     """Текущие пути данных."""
     try:
-        from path_config import get_config_payload
+        from path_config import apply_paths_to_settings, get_config_payload
+
+        apply_paths_to_settings()
         return get_config_payload()
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=http_detail(e, "init"))
 
 

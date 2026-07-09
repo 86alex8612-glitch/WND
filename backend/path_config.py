@@ -153,8 +153,13 @@ def read_data_root() -> str:
     return str(default_data_root())
 
 
+def read_paths() -> Dict[str, str]:
+    """Прочитать пути без создания папок (для /api/config)."""
+    return resolve_paths(read_data_root())
+
+
 def load_paths() -> Dict[str, str]:
-    paths = resolve_paths(read_data_root())
+    paths = read_paths()
     ensure_directories(paths)
     return paths
 
@@ -184,7 +189,11 @@ def apply_paths_to_settings() -> Dict[str, str]:
 
 
 def get_config_payload() -> Dict:
-    paths = load_paths()
+    try:
+        paths = read_paths()
+    except Exception:
+        paths = resolve_paths(str(default_data_root()))
+
     data_root = paths["data_root"]
     is_windows = os.name == "nt"
     paths_editable = not is_paths_locked_by_env()

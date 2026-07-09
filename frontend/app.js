@@ -142,8 +142,11 @@ function renderStatItem(baseKey, baseData) {
     const recreateBtn = baseKey !== 'vnd'
         ? `<button type="button" class="stat-base-recreate" data-base="${baseKey}"${disabledAttr}>Пересоздать</button>`
         : '';
-    const uploadBtn = BASE_UPLOAD_TARGETS[baseKey]
-        ? `<button type="button" class="stat-base-upload" data-base="${baseKey}" data-target="${BASE_UPLOAD_TARGETS[baseKey]}" title="Загрузить файлы в папку ${BASE_UPLOAD_TARGETS[baseKey]}">Загрузить</button>`
+    const uploadFilesBtn = BASE_UPLOAD_TARGETS[baseKey]
+        ? `<button type="button" class="stat-base-upload stat-base-upload-files" data-base="${baseKey}" data-target="${BASE_UPLOAD_TARGETS[baseKey]}" data-mode="files" title="Выбрать файлы на вашем компьютере">Файлы с ПК</button>`
+        : '';
+    const uploadFolderBtn = BASE_UPLOAD_TARGETS[baseKey]
+        ? `<button type="button" class="stat-base-upload stat-base-upload-folder" data-base="${baseKey}" data-target="${BASE_UPLOAD_TARGETS[baseKey]}" data-mode="folder" title="Выбрать папку на компьютере (например FZYur) — загрузка на сервер">Папка с ПК</button>`
         : '';
 
     return `
@@ -152,7 +155,8 @@ function renderStatItem(baseKey, baseData) {
                 <div class="stat-item-row">
                     <button type="button" class="stat-base-link" data-base="${baseKey}" title="Показать список документов">${label}</button>
                     <div class="stat-item-right">
-                        ${uploadBtn}
+                        ${uploadFilesBtn}
+                        ${uploadFolderBtn}
                         <button type="button" class="stat-base-reset" data-base="${baseKey}"${disabledAttr}>Сбросить</button>
                         ${recreateBtn}
                         <span class="stat-status ${baseData?.ready ? 'ready' : 'not-ready'}">
@@ -252,7 +256,12 @@ function initStatsCardHandlers() {
         if (uploadBtn) {
             pendingStatsUploadTarget = uploadBtn.dataset.target || '';
             if (!pendingStatsUploadTarget) return;
-            document.getElementById('stats-upload-files-input')?.click();
+            const mode = uploadBtn.dataset.mode || 'files';
+            if (mode === 'folder') {
+                document.getElementById('stats-upload-folder-input')?.click();
+            } else {
+                document.getElementById('stats-upload-files-input')?.click();
+            }
             return;
         }
 
@@ -371,7 +380,7 @@ async function updateStatsInCard() {
             </label>
             <div class="card-icon">📊</div>
             <h2>Статистика</h2>
-            <p class="stats-card-subtitle">Информация о готовности баз данных</p>
+            <p class="stats-card-subtitle">ГОСТ и ФЗ загружаются с вашего компьютера через браузер</p>
             <div class="stats-in-card">
                 ${renderStatItem('gost', data.gost)}
                 ${renderStatItem('fz', data.fz)}
@@ -405,7 +414,7 @@ async function updateStatsInCard() {
             statsCard.innerHTML = `
                 <div class="card-icon">📊</div>
                 <h2>Статистика</h2>
-                <p class="stats-card-subtitle">Информация о готовности баз данных</p>
+                <p class="stats-card-subtitle">ГОСТ и ФЗ загружаются с вашего компьютера через браузер</p>
                 <p style="color: #dc3545;">${formatCaughtError(error, 'Не удалось загрузить статистику')}</p>
                 <p style="color: #666; font-size: 0.9rem;">${WND_SERVER_HINT}</p>
             `;

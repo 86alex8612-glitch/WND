@@ -229,15 +229,22 @@ function openSettingsModal() {
     const modal = document.getElementById('app-settings-modal');
     if (!modal) return;
 
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+
     fetchAppConfig(true)
         .then((config) => {
             renderSettingsForm(config);
             setSettingsStatus('', 'info');
-            modal.hidden = false;
-            modal.setAttribute('aria-hidden', 'false');
         })
         .catch((error) => {
-            alert('❌ ' + formatCaughtError(error, 'Не удалось открыть настройки'));
+            renderSettingsForm({
+                data_root: '—',
+                work_folder: '—',
+                paths_editable: false,
+                settings_hint: formatCaughtError(error, 'Не удалось загрузить настройки с сервера'),
+            });
+            setSettingsStatus(formatCaughtError(error, 'Ошибка загрузки настроек'), 'error');
         });
 }
 
