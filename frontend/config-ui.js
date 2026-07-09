@@ -1,5 +1,6 @@
 /**
- * Настройки рабочей папки (config.cfg) и сохранение в рабочие каталоги.
+ * Настройки: рабочая папка и подпапки.
+ * Загрузка ГОСТ/ФЗ — в карточке «Статистика» (app.js).
  */
 
 const CONFIG_API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
@@ -24,77 +25,64 @@ async function fetchAppConfig(force = false) {
     return appConfigCache;
 }
 
-function formatFolderList(config) {
-    const folders = config?.display_folders || [];
-    if (!folders.length) {
-        return '';
-    }
-    return folders.map((item) => `${item.name}: ${item.path}`).join('\n');
-}
-
-function buildPreviewFolders(config, workFolderOverride) {
-    const root = String(workFolderOverride || config?.work_folder || '').trim().replace(/[\\/]+$/, '');
-    const template = config?.display_folders || [];
-    if (!root) {
-        return template;
-    }
-    const separator = root.includes('\\') && !root.includes('/') ? '\\' : '/';
-    return template.map((item) => ({
-        ...item,
-        path: `${root}${separator}${item.name}`,
-    }));
-}
-
-function renderConfigFolderList(container, config, workFolderOverride) {
-    if (!container) return;
-    const folders = buildPreviewFolders(config, workFolderOverride);
-    if (!folders.length) {
-        container.innerHTML = '<p class="config-folders-empty">Папки не заданы</p>';
-        return;
-    }
-    container.innerHTML = folders.map((item) => (
-        `<div class="config-folder-row">`
-        + `<span class="config-folder-name">${escapeConfigHtml(item.name)}</span>`
-        + `<div class="config-folder-details">`
-        + `<span class="config-folder-desc">${escapeConfigHtml(item.description || '')}</span>`
-        + `<span class="config-folder-path">${escapeConfigHtml(item.path)}</span>`
-        + `</div>`
-        + `</div>`
-    )).join('');
-}
-
-function refreshSettingsFolderPreview() {
-    const input = document.getElementById('settings-work-folder');
-    const container = document.getElementById('settings-folder-list');
-    if (!appConfigCache || !container) return;
-    renderConfigFolderList(container, appConfigCache, input?.value?.trim() || '');
-}
-
-function applyBrowseAvailability(config) {
-    const browseBtn = document.getElementById('btn-settings-browse');
-    const hint = document.getElementById('settings-browse-hint');
-    const available = config?.browse_folder_available !== false;
-
-    if (browseBtn) {
-        browseBtn.disabled = !available;
-        browseBtn.title = available
-            ? 'Выбрать папку на этом компьютере'
-            : (config?.browse_folder_hint || 'На сервере укажите путь вручную');
-    }
-
-    if (hint) {
-        const text = config?.browse_folder_hint || '';
-        hint.textContent = text;
-        hint.hidden = !text || available;
-    }
-}
-
 function escapeConfigHtml(text) {
     return String(text ?? '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+function renderSettingsForm(config) {
+    const inputEl = document.getElementById('settings-work-folder');
+    const labelEl = document.getElementById('settings-data-root-label');
+    const hintEl = document.getElementById('settings-main-hint');
+    const browseBtn = document.getElementById('btn-settings-browse');
+    const saveBtn = document.getElementById('btn-settings-save');
+    const defaultBtn = document.getElementById('btn-settings-default');
+    const foldersEl = document.getElementById('settings-folder-list');
+    const dataRoot = config?.data_root || config?.work_folder || '';
+    const editable = Boolean(config?.paths_editable);
+
+    if (labelEl) {
+        labelEl.textContent = config?.data_root_label || 'Рабочая папка';
+    }
+    if (hintEl) {
+        hintEl.textContent = config?.settings_hint
+            || 'Укажите рабочую папку. При сохранении будут созданы необходимые подпапки.';
+    }
+    if (inputEl) {
+        inputEl.value = dataRoot;
+        inputEl.readOnly = !editable;
+        inputEl.disabled = !editable;
+    }
+    if (browseBtn) {
+        browseBtn.hidden = !config?.folder_browse_available;
+        browseBtn.disabled = !editable;
+    }
+    if (saveBtn) saveBtn.disabled = !editable;
+    if (defaultBtn) defaultBtn.disabled = !editable;
+
+    if (foldersEl) {
+        const folders = config?.display_folders || [];
+        foldersEl.innerHTML = folders.map((item) => (
+            `<div class="config-folder-row">`
+            + `<span class="config-folder-name">${escapeConfigHtml(item.name)}</span>`
+            + `<div class="config-folder-details">`
+            + `<span class="config-folder-desc">${escapeConfigHtml(item.description || '')}</span>`
+            + `<span class="config-folder-path">${escapeConfigHtml(item.path)}</span>`
+            + `</div>`
+            + `</div>`
+        )).join('');
+    }
+}
+
+function setSettingsStatus(message, type = 'info') {
+    const status = document.getElementById('settings-save-status');
+    if (!status) return;
+    status.hidden = !message;
+    status.textContent = message || '';
+    status.className = `settings-save-status settings-save-status-${type}`;
 }
 
 async function persistJsonPost(url, body, errorLabel) {
@@ -113,6 +101,107 @@ async function saveDocumentToWorkFolder(url, body, errorLabel) {
     return persistJsonPost(url, { ...body, persist_only: true }, errorLabel);
 }
 
+async function uploadFilesToFolder(target, fileList, options = {}) {
+    const files = Array.from(fileList || []);
+    if (!files.length) {
+        return null;
+    }
+
+    const preserveRelativePath = Boolean(options.preserveRelativePath);
+    const formData = new FormData();
+    for (const file of files) {
+        const uploadName = preserveRelativePath && file.webkitRelativePath
+            ? file.webkitRelativePath
+            : file.name;
+        formData.append('files', file, uploadName);
+    }
+
+    const response = await fetch(
+        `${getConfigApiBase()}/api/config/upload-files?target_folder=${encodeURIComponent(target)}`,
+        {
+            method: 'POST',
+            body: formData,
+        },
+    );
+    if (!response.ok) {
+        throw new Error(await readApiError(response, 'Не удалось загрузить файлы'));
+    }
+    return response.json();
+}
+
+async function saveWorkFolderSettings() {
+    const inputEl = document.getElementById('settings-work-folder');
+    const workFolder = (inputEl?.value || '').trim();
+    if (!workFolder) {
+        setSettingsStatus('Укажите путь к рабочей папке', 'error');
+        return;
+    }
+
+    setSettingsStatus('Сохранение...', 'info');
+    try {
+        const result = await persistJsonPost(
+            `${getConfigApiBase()}/api/config/save`,
+            { work_folder: workFolder },
+            'Не удалось сохранить рабочую папку',
+        );
+        appConfigCache = result;
+        renderSettingsForm(result);
+        setSettingsStatus(result.message || 'Рабочая папка сохранена', 'success');
+        if (typeof updateStatsInCard === 'function') {
+            await updateStatsInCard();
+        }
+    } catch (error) {
+        setSettingsStatus(formatCaughtError(error, 'Не удалось сохранить рабочую папку'), 'error');
+    }
+}
+
+async function resetWorkFolderSettings() {
+    if (!confirm('Установить рабочую папку по умолчанию?')) {
+        return;
+    }
+
+    setSettingsStatus('Сброс...', 'info');
+    try {
+        const result = await persistJsonPost(
+            `${getConfigApiBase()}/api/config/default`,
+            {},
+            'Не удалось сбросить рабочую папку',
+        );
+        appConfigCache = result;
+        renderSettingsForm(result);
+        setSettingsStatus(result.message || 'Установлена папка по умолчанию', 'success');
+        if (typeof updateStatsInCard === 'function') {
+            await updateStatsInCard();
+        }
+    } catch (error) {
+        setSettingsStatus(formatCaughtError(error, 'Не удалось сбросить рабочую папку'), 'error');
+    }
+}
+
+async function browseWorkFolder() {
+    const inputEl = document.getElementById('settings-work-folder');
+    const initialDir = (inputEl?.value || '').trim();
+
+    setSettingsStatus('Откройте окно выбора папки...', 'info');
+    try {
+        const result = await persistJsonPost(
+            `${getConfigApiBase()}/api/config/browse-folder`,
+            { initial_dir: initialDir },
+            'Не удалось открыть диалог выбора папки',
+        );
+        if (result.cancelled) {
+            setSettingsStatus('', 'info');
+            return;
+        }
+        if (inputEl && result.work_folder) {
+            inputEl.value = result.work_folder;
+        }
+        setSettingsStatus('Папка выбрана. Нажмите «Сохранить».', 'success');
+    } catch (error) {
+        setSettingsStatus(formatCaughtError(error, 'Не удалось выбрать папку'), 'error');
+    }
+}
+
 function bindSettingsModalHandlers() {
     const modal = document.getElementById('app-settings-modal');
     if (!modal || modal.dataset.bound === '1') return;
@@ -125,26 +214,9 @@ function bindSettingsModalHandlers() {
         });
     });
 
-    document.getElementById('btn-settings-save')?.addEventListener('click', saveSettingsFromModal);
-    document.getElementById('btn-settings-default')?.addEventListener('click', resetSettingsToDefault);
-    document.getElementById('btn-settings-browse')?.addEventListener('click', browseWorkFolderFromModal);
-    document.getElementById('settings-work-folder')?.addEventListener('input', refreshSettingsFolderPreview);
-    document.getElementById('btn-settings-upload-files')?.addEventListener('click', () => {
-        document.getElementById('settings-upload-files-input')?.click();
-    });
-    document.getElementById('btn-settings-upload-folder')?.addEventListener('click', () => {
-        document.getElementById('settings-upload-folder-input')?.click();
-    });
-    document.getElementById('settings-upload-files-input')?.addEventListener('change', (event) => {
-        uploadSettingsFiles(event.target.files, false).finally(() => {
-            event.target.value = '';
-        });
-    });
-    document.getElementById('settings-upload-folder-input')?.addEventListener('change', (event) => {
-        uploadSettingsFiles(event.target.files, true).finally(() => {
-            event.target.value = '';
-        });
-    });
+    document.getElementById('btn-settings-save')?.addEventListener('click', saveWorkFolderSettings);
+    document.getElementById('btn-settings-default')?.addEventListener('click', resetWorkFolderSettings);
+    document.getElementById('btn-settings-browse')?.addEventListener('click', browseWorkFolder);
 
     document.addEventListener('keydown', (event) => {
         if (event.key === 'Escape' && modal && !modal.hidden) {
@@ -159,12 +231,8 @@ function openSettingsModal() {
 
     fetchAppConfig(true)
         .then((config) => {
-            const input = document.getElementById('settings-work-folder');
-            if (input) {
-                input.value = config.work_folder || config.default_work_folder || 'C:\\WND';
-            }
-            renderConfigFolderList(document.getElementById('settings-folder-list'), config);
-            applyBrowseAvailability(config);
+            renderSettingsForm(config);
+            setSettingsStatus('', 'info');
             modal.hidden = false;
             modal.setAttribute('aria-hidden', 'false');
         })
@@ -178,139 +246,6 @@ function closeSettingsModal() {
     if (!modal) return;
     modal.hidden = true;
     modal.setAttribute('aria-hidden', 'true');
-}
-
-async function browseWorkFolderFromModal() {
-    const input = document.getElementById('settings-work-folder');
-    const browseBtn = document.getElementById('btn-settings-browse');
-    const initialPath = input?.value?.trim() || appConfigCache?.work_folder || '';
-
-    if (browseBtn) {
-        browseBtn.disabled = true;
-        browseBtn.textContent = '…';
-    }
-
-    try {
-        const result = await persistJsonPost(
-            `${getConfigApiBase()}/api/config/browse-folder`,
-            { initial_path: initialPath },
-            'Не удалось открыть выбор папки',
-        );
-        if (result.status === 'unavailable') {
-            alert(result.message || 'На сервере выбор папки через диалог недоступен. Введите путь вручную.');
-            return;
-        }
-        if (result.status === 'cancelled' || !result.path) {
-            return;
-        }
-        if (input) {
-            input.value = result.path;
-        }
-        refreshSettingsFolderPreview();
-    } catch (error) {
-        alert('❌ ' + formatCaughtError(error, 'Не удалось открыть выбор папки'));
-    } finally {
-        if (browseBtn) {
-            browseBtn.disabled = false;
-            browseBtn.textContent = 'Обзор…';
-        }
-    }
-}
-
-function setSettingsUploadStatus(message, type = 'info') {
-    const status = document.getElementById('settings-upload-status');
-    if (!status) return;
-    status.hidden = !message;
-    status.textContent = message || '';
-    status.className = `settings-upload-status settings-upload-status-${type}`;
-}
-
-async function uploadSettingsFiles(fileList, preserveRelativePath) {
-    const files = Array.from(fileList || []);
-    if (!files.length) return;
-
-    const target = document.getElementById('settings-upload-target')?.value || 'IN';
-    const formData = new FormData();
-    for (const file of files) {
-        const uploadName = preserveRelativePath && file.webkitRelativePath
-            ? file.webkitRelativePath
-            : file.name;
-        formData.append('files', file, uploadName);
-    }
-
-    const buttons = [
-        document.getElementById('btn-settings-upload-files'),
-        document.getElementById('btn-settings-upload-folder'),
-    ].filter(Boolean);
-    buttons.forEach((button) => { button.disabled = true; });
-    setSettingsUploadStatus(`Загрузка файлов: ${files.length}...`, 'info');
-
-    try {
-        const response = await fetch(
-            `${getConfigApiBase()}/api/config/upload-files?target_folder=${encodeURIComponent(target)}`,
-            {
-                method: 'POST',
-                body: formData,
-            },
-        );
-        if (!response.ok) {
-            throw new Error(await readApiError(response, 'Не удалось загрузить файлы'));
-        }
-        const result = await response.json();
-        setSettingsUploadStatus(result.message || `Загружено файлов: ${result.saved_count || files.length}`, 'success');
-        await fetchAppConfig(true).then((config) => {
-            appConfigCache = config;
-            renderConfigFolderList(document.getElementById('settings-folder-list'), config);
-            applyBrowseAvailability(config);
-        });
-    } catch (error) {
-        setSettingsUploadStatus(formatCaughtError(error, 'Не удалось загрузить файлы'), 'error');
-    } finally {
-        buttons.forEach((button) => { button.disabled = false; });
-    }
-}
-
-async function saveSettingsFromModal() {
-    const input = document.getElementById('settings-work-folder');
-    const workFolder = input?.value?.trim();
-    if (!workFolder) {
-        alert('Укажите рабочую папку');
-        return;
-    }
-
-    try {
-        const result = await persistJsonPost(
-            `${getConfigApiBase()}/api/config/save`,
-            { work_folder: workFolder },
-            'Не удалось сохранить настройки',
-        );
-        appConfigCache = result;
-        renderConfigFolderList(document.getElementById('settings-folder-list'), result);
-        applyBrowseAvailability(result);
-        alert('✅ ' + (result.message || 'Настройки сохранены'));
-    } catch (error) {
-        alert('❌ ' + formatCaughtError(error, 'Не удалось сохранить настройки'));
-    }
-}
-
-async function resetSettingsToDefault() {
-    try {
-        const result = await persistJsonPost(
-            `${getConfigApiBase()}/api/config/default`,
-            {},
-            'Не удалось восстановить настройки',
-        );
-        appConfigCache = result;
-        const input = document.getElementById('settings-work-folder');
-        if (input) {
-            input.value = result.work_folder || result.default_work_folder || 'C:\\WND';
-        }
-        renderConfigFolderList(document.getElementById('settings-folder-list'), result);
-        applyBrowseAvailability(result);
-        alert('✅ ' + (result.message || 'Установлены настройки по умолчанию'));
-    } catch (error) {
-        alert('❌ ' + formatCaughtError(error, 'Не удалось восстановить настройки'));
-    }
 }
 
 function initSettingsGear() {
@@ -330,4 +265,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
 window.fetchAppConfig = fetchAppConfig;
 window.saveDocumentToWorkFolder = saveDocumentToWorkFolder;
+window.uploadFilesToFolder = uploadFilesToFolder;
 window.openSettingsModal = openSettingsModal;

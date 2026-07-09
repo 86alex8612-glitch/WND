@@ -24,14 +24,15 @@
                 <details class="analiz-guide">
                     <summary class="analiz-guide-summary">Как пользоваться разделом</summary>
                     <ol class="analiz-guide-list">
-                        <li>Загрузите файл ВНД (PDF, DOCX или TXT). Документ сохраняется в подпапку <strong>IN</strong> рабочей папки (см. ⚙ Настройки на главном экране).</li>
+                        <li>Нажмите <strong>«Выбрать файл»</strong> — диалог откроется в папке <strong>IN</strong>, можно выбрать документ из любого места.</li>
                         <li>Убедитесь, что справа отображается успешная загрузка и корректное название документа.</li>
                         <li>Нажмите <strong>«Начать анализ»</strong>. При необходимости система предложит скачать недостающие федеральные акты в папку <strong>FZ</strong>.</li>
                         <li>На этапе 1 уточните параметры организации и области законодательства.</li>
                         <li>На этапе 2 получите правовой отчёт. Кнопка <strong>«Сохранить»</strong> записывает PDF в подпапку <strong>OUT</strong>.</li>
                     </ol>
                     <p class="analiz-guide-note">
-                        Пути к папкам задаются в файле <strong>config.cfg</strong> (⚙ Настройки на главном экране). По умолчанию: <strong>C:\WND\</strong>.
+                        ГОСТ и ФЗ загружаются в карточке <strong>«Статистика»</strong> на главном экране.
+                        Рабочая папка — в ⚙ <strong>Настройки</strong>.
                     </p>
                     <button type="button" class="btn-secondary analiz-guide-files-btn" onclick="openAnalizFilesModal()">
                         Правила работы с файлами
@@ -41,15 +42,16 @@
                 <section class="analiz-setup-card">
                     <div class="analiz-setup-grid">
                         <div class="analiz-upload-col">
-                            <h3>1. Загрузить документ для анализа</h3>
-                            <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" />
-                            <button type="button" class="btn-primary" onclick="uploadDocument()">Загрузить</button>
+                            <h3>1. Выбрать документ для анализа</h3>
+                            <p class="analiz-upload-hint">PDF, DOCX или TXT. Диалог начинается с папки IN.</p>
+                            <input type="file" id="file-input" accept=".pdf,.docx,.doc,.txt" hidden />
+                            <button type="button" class="btn-primary" id="btn-pick-analiz-file" onclick="pickAnalizFile()">Выбрать файл</button>
                         </div>
                         <div class="analiz-upload-status-col">
                             <h3 class="analiz-status-heading">Статус загрузки</h3>
                             <div id="upload-result" class="upload-result analiz-upload-result-panel">
                                 <div id="upload-result-content" class="analiz-upload-placeholder">
-                                    Выберите файл и нажмите «Загрузить»
+                                    Нажмите «Выбрать файл»
                                 </div>
                             </div>
                         </div>
@@ -203,7 +205,7 @@
                 <p>Чтобы анализ, переработка и поиск по ВНД работали согласованно, соблюдайте простые правила:</p>
                 <ul>
                     <li><strong>Не переименовывайте</strong> основной документ и отчёт анализа после загрузки. Подбор связанных файлов выполняется по имени.</li>
-                    <li>Рабочая папка задаётся в <strong>config.cfg</strong> (⚙ Настройки на главном экране). По умолчанию: <strong>C:\WND\</strong>.</li>
+                    <li>Файлы загружаются через браузер в ⚙ <strong>Настройки</strong>. Отчёты скачиваются кнопкой «Скачать».</li>
                     <li>Исходный ВНД храните в подпапке <strong>IN</strong> — туда попадает файл при загрузке в этом разделе.</li>
                     <li>Отчёт анализа сохраняется в подпапку <strong>OUT</strong>. Его имя должно соответствовать документу.</li>
                     <li>Федеральные акты загружаются в подпапку <strong>FZ</strong>, нормативные ГОСТ — в <strong>FZYur</strong>.</li>
@@ -218,8 +220,8 @@
     </div>
 
     <script src="/static/errors.js"></script>
-    <script src="/static/config-ui.js?v=20260801"></script>
+    <script src="/static/config-ui.js?v=20260709d"></script>
     <script src="/static/downloads.js"></script>
-    <script src="/static/analiz.js?v=20260803"></script>
+    <script src="/static/analiz.js?v=20260709d"></script>
 </body>
 </html>

@@ -257,6 +257,57 @@ body {
     color: #6c757d;
 }
 
+.config-folder-list-upload {
+    max-height: 420px;
+}
+
+.config-folder-card {
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    background: #fff;
+    padding: 8px;
+}
+
+.config-folder-card + .config-folder-card {
+    margin-top: 8px;
+}
+
+.config-folder-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+    padding-top: 8px;
+    border-top: 1px solid #f0f0f0;
+}
+
+.config-folder-actions .btn-secondary {
+    font-size: 0.78rem;
+    padding: 6px 10px;
+}
+
+.settings-upload-intro {
+    margin-top: 0;
+    margin-bottom: 10px;
+}
+
+.settings-data-root-panel {
+    margin: 0 0 14px;
+    padding: 10px;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    background: #f8f9fa;
+}
+
+.settings-data-root-value {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.78rem;
+    color: #333;
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
 .settings-upload-panel {
     margin: 4px 0 14px;
     padding: 10px;
@@ -296,6 +347,92 @@ body {
     color: #842029;
     background: #f8d7da;
     border: 1px solid #f5c2c7;
+}
+
+.settings-save-status {
+    margin-top: 8px;
+    padding: 7px 9px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.settings-save-status-info {
+    color: #084298;
+    background: #cfe2ff;
+    border: 1px solid #b6d4fe;
+}
+
+.settings-save-status-success {
+    color: #0f5132;
+    background: #d1e7dd;
+    border: 1px solid #badbcc;
+}
+
+.settings-save-status-error {
+    color: #842029;
+    background: #f8d7da;
+    border: 1px solid #f5c2c7;
+}
+
+.stats-card-subtitle {
+    margin: 0 0 10px;
+    font-size: 0.9rem;
+    color: #666;
+    line-height: 1.35;
+}
+
+.stats-upload-hint {
+    margin: 0 0 8px;
+    font-size: 0.75rem;
+    color: #666;
+    line-height: 1.35;
+}
+
+.stats-upload-status {
+    margin: 8px 0 0;
+    padding: 7px 9px;
+    border-radius: 4px;
+    font-size: 0.78rem;
+    line-height: 1.35;
+}
+
+.stats-upload-status-info {
+    color: #084298;
+    background: #cfe2ff;
+    border: 1px solid #b6d4fe;
+}
+
+.stats-upload-status-success {
+    color: #0f5132;
+    background: #d1e7dd;
+    border: 1px solid #badbcc;
+}
+
+.stats-upload-status-error {
+    color: #842029;
+    background: #f8d7da;
+    border: 1px solid #f5c2c7;
+}
+
+.stat-base-upload {
+    font-size: 0.72rem;
+    padding: 4px 8px;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    background: #fff;
+    color: #333;
+    cursor: pointer;
+}
+
+.stat-base-upload:hover {
+    background: #f1f3f5;
+}
+
+.analiz-upload-hint {
+    margin: 0 0 10px;
+    font-size: 0.85rem;
+    color: #666;
 }
 
 .app-settings-actions {

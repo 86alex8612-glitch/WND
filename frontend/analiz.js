@@ -53,6 +53,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     bindAnalizModalHandlers();
     updateVndNameDisplay();
     updateStartAnalysisButton();
+    document.getElementById('file-input')?.addEventListener('change', (event) => {
+        if (event.target.files && event.target.files[0]) {
+            uploadDocument();
+        }
+    });
     await checkBasesStatus();
 });
 
@@ -257,6 +262,72 @@ function buildCompactUploadResultHtml(data, file, result) {
     `;
 }
 
+async function pickAnalizFile() {
+    try {
+        const config = await fetchAppConfig();
+        if (config?.file_browse_available) {
+            await browseVndDocument();
+            return;
+        }
+    } catch (error) {
+        console.warn('Не удалось определить режим выбора файла:', error);
+    }
+    document.getElementById('file-input')?.click();
+}
+
+async function browseVndDocument() {
+    clearFederalRefsSession();
+    hideFederalRefsPanel();
+    const resultContent = document.getElementById('upload-result-content');
+    const pickBtn = document.getElementById('btn-pick-analiz-file');
+
+    if (pickBtn) pickBtn.disabled = true;
+    resultContent.innerHTML = '<p class="analiz-upload-placeholder">Откройте окно выбора файла (начальная папка IN)...</p>';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/files/browse-vnd`, { method: 'POST' });
+        if (!response.ok) {
+            throw new Error(await readApiError(response, 'Не удалось выбрать файл'));
+        }
+        const data = await response.json();
+        if (data.cancelled) {
+            resultContent.innerHTML = '<div class="analiz-upload-placeholder">Выбор файла отменён</div>';
+            return;
+        }
+        await applyVndUploadResult(data, { name: data.filename || 'документ' });
+    } catch (error) {
+        resultContent.innerHTML = `
+            <div class="upload-error">
+                <p style="color: #dc3545; font-weight: bold;">✗ Ошибка выбора файла</p>
+                <p style="color: #dc3545;">${formatCaughtError(error, 'Не удалось выбрать файл')}</p>
+            </div>
+        `;
+    } finally {
+        if (pickBtn) pickBtn.disabled = false;
+    }
+}
+
+async function applyVndUploadResult(data, fileMeta) {
+    const resultContent = document.getElementById('upload-result-content');
+    const result = data.result || { status: 'success' };
+    resultContent.innerHTML = buildCompactUploadResultHtml(data, fileMeta, result);
+
+    const sourceName = fileMeta?.name || data.filename || '';
+    const fileNameWithoutExt = sourceName.replace(/\.[^/.]+$/, '');
+    uploadedDocumentName = fileNameWithoutExt;
+    uploadedFilename = data.filename || sourceName;
+    updateVndNameDisplay(fileNameWithoutExt);
+    updateStartAnalysisButton();
+
+    if (fileMeta instanceof File && fileMeta.type === 'text/plain') {
+        uploadedDocumentText = await fileMeta.text();
+    }
+
+    await checkBasesStatus();
+}
+
+window.pickAnalizFile = pickAnalizFile;
+
 async function uploadDocument() {
     clearFederalRefsSession();
     hideFederalRefsPanel();
@@ -345,25 +416,7 @@ async function uploadDocument() {
         if (response.ok) {
             updateProgress(progressBarFill, progressMessage, 100, 'Завершено!');
             await new Promise(resolve => setTimeout(resolve, 300));
-
-            const result = data.result || { status: 'success' };
-            resultContent.innerHTML = buildCompactUploadResultHtml(data, file, result);
-            
-            // Сохраняем название загруженного документа (без расширения)
-            const fileNameWithoutExt = file.name.replace(/\.[^/.]+$/, "");
-            uploadedDocumentName = fileNameWithoutExt;
-            uploadedFilename = data.filename || file.name;
-            updateVndNameDisplay(fileNameWithoutExt);
-            updateStartAnalysisButton();
-            
-            // Можно попытаться извлечь текст из файла для анализа
-            if (file.type === 'text/plain') {
-                const text = await file.text();
-                uploadedDocumentText = text;
-            }
-            
-            // Обновляем статус баз после загрузки
-            await checkBasesStatus();
+            await applyVndUploadResult(data, file);
         }
     } catch (error) {
         console.error('Ошибка загрузки:', error);

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>НейроКонсультант по ВНД</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260801">
+    <link rel="stylesheet" href="/static/styles.css?v=20260709e">
 </head>
 <body>
     <!-- Шапка -->
@@ -18,37 +18,33 @@
     <!-- Основной контент -->
     <main class="main-content">
         <div class="menu-grid">
-            <!-- Квадрат 1: Анализ ВНД -->
             <div class="menu-card" id="card-analiz" onclick="openAnalizPage()">
                 <div class="card-icon">📋</div>
                 <h2>Анализ ВНД</h2>
                 <p>Проверка внутренних нормативных документов на соответствие законодательству РФ</p>
             </div>
 
-            <!-- Квадрат 2: Помощник в создании ВНД -->
             <div class="menu-card" id="card-create" onclick="openCreatePage()">
                 <div class="card-icon">✏️</div>
                 <h2>Помощник в создании ВНД</h2>
                 <p>Помощь в создании внутренних нормативных документов</p>
             </div>
 
-            <!-- Квадрат 3: Поиск в ВНД -->
             <div class="menu-card" id="card-search" onclick="openSearchPage()">
                 <div class="card-icon">🔍</div>
                 <h2>Поиск в ВНД</h2>
                 <p>Поиск и консультации по внутренним нормативным документам</p>
             </div>
 
-            <!-- Квадрат 4: Статистика -->
             <div class="menu-card" id="card-stats">
                 <div class="card-icon">📊</div>
                 <h2>Статистика</h2>
                 <p>Информация о готовности баз данных</p>
             </div>
         </div>
+        <div id="stats-upload-status" class="stats-upload-status" hidden></div>
     </main>
 
-    <!-- Подвал -->
     <footer class="footer">
         <div class="footer-content">
             <p>Разработчик: Алексей Ларионов</p>
@@ -59,44 +55,25 @@
         <div class="app-settings-backdrop" data-close-settings></div>
         <div class="app-settings-dialog" role="dialog" aria-labelledby="app-settings-title">
             <div class="app-settings-header">
-                <h3 id="app-settings-title">Настройки конфигурации Нейро консультанта</h3>
+                <h3 id="app-settings-title">Настройки</h3>
                 <button type="button" class="app-settings-close" data-close-settings aria-label="Закрыть">&times;</button>
             </div>
             <div class="app-settings-body">
-                <label class="app-settings-label" for="settings-work-folder">Рабочая папка</label>
+                <p class="app-settings-hint" id="settings-main-hint"></p>
+
+                <label class="app-settings-label" id="settings-data-root-label" for="settings-work-folder">Рабочая папка</label>
                 <div class="app-settings-path-row">
                     <input type="text" id="settings-work-folder" class="app-settings-input" placeholder="C:\WND" autocomplete="off" />
                     <button type="button" class="btn-secondary btn-settings-browse" id="btn-settings-browse" title="Выбрать папку">Обзор…</button>
                 </div>
-                <p class="app-settings-hint">Укажите полный путь или нажмите «Обзор…» (только на Windows). При сохранении будут созданы подпапки ниже.</p>
-                <p class="app-settings-hint app-settings-browse-hint" id="settings-browse-hint" hidden></p>
 
-                <h4 class="app-settings-subtitle">Папки для сохранения</h4>
+                <h4 class="app-settings-subtitle">Подпапки (создаются автоматически)</h4>
                 <div id="settings-folder-list" class="config-folder-list"></div>
-
-                <h4 class="app-settings-subtitle">Загрузка файлов с вашего ПК</h4>
-                <div class="settings-upload-panel">
-                    <label class="app-settings-label" for="settings-upload-target">Куда загрузить</label>
-                    <select id="settings-upload-target" class="app-settings-input">
-                        <option value="IN">IN — входящие документы ВНД</option>
-                        <option value="FZYur">FZYur — ГОСТ и стандарты</option>
-                        <option value="FZ">FZ — федеральные законы</option>
-                        <option value="OUT">OUT — отчёты и результаты</option>
-                        <option value="new-doc">new-doc — проекты новых ВНД</option>
-                    </select>
-                    <p class="app-settings-hint">Этот «Обзор» работает через браузер: выбирает файлы или папку на вашем ПК и загружает их на сервер в выбранную подпапку.</p>
-                    <div class="settings-upload-actions">
-                        <button type="button" class="btn-secondary" id="btn-settings-upload-files">Выбрать файлы…</button>
-                        <button type="button" class="btn-secondary" id="btn-settings-upload-folder">Выбрать папку…</button>
-                    </div>
-                    <input type="file" id="settings-upload-files-input" multiple hidden />
-                    <input type="file" id="settings-upload-folder-input" webkitdirectory directory multiple hidden />
-                    <div id="settings-upload-status" class="settings-upload-status" hidden></div>
-                </div>
+                <div id="settings-save-status" class="settings-save-status" hidden></div>
 
                 <div class="app-settings-actions">
                     <button type="button" class="btn-primary" id="btn-settings-save">Сохранить</button>
-                    <button type="button" class="btn-secondary" id="btn-settings-default">Установить по умолчанию</button>
+                    <button type="button" class="btn-secondary" id="btn-settings-default">По умолчанию</button>
                     <button type="button" class="btn-secondary" data-close-settings>Закрыть</button>
                 </div>
             </div>
@@ -114,11 +91,11 @@
         </div>
     </div>
 
+    <input type="file" id="stats-upload-files-input" multiple hidden />
+    <input type="file" id="stats-upload-folder-input" webkitdirectory directory multiple hidden />
+
     <script src="/static/errors.js"></script>
-    <script src="/static/config-ui.js?v=20260708"></script>
-    <script src="/static/app.js?v=20260801"></script>
+    <script src="/static/config-ui.js?v=20260709e"></script>
+    <script src="/static/app.js?v=20260709e"></script>
 </body>
 </html>
-
-
-

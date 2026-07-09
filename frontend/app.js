@@ -29,7 +29,13 @@ const BASE_SOURCE_HINTS = {
     vnd: 'IN',
 };
 
+const BASE_UPLOAD_TARGETS = {
+    gost: 'FZYur',
+    fz: 'FZ',
+};
+
 let statsEditMode = false;
+let pendingStatsUploadTarget = '';
 
 function escapeHtml(text) {
     return String(text ?? '')
@@ -136,6 +142,9 @@ function renderStatItem(baseKey, baseData) {
     const recreateBtn = baseKey !== 'vnd'
         ? `<button type="button" class="stat-base-recreate" data-base="${baseKey}"${disabledAttr}>Пересоздать</button>`
         : '';
+    const uploadBtn = BASE_UPLOAD_TARGETS[baseKey]
+        ? `<button type="button" class="stat-base-upload" data-base="${baseKey}" data-target="${BASE_UPLOAD_TARGETS[baseKey]}" title="Загрузить файлы в папку ${BASE_UPLOAD_TARGETS[baseKey]}">Загрузить</button>`
+        : '';
 
     return `
         <div class="stat-item">
@@ -143,6 +152,7 @@ function renderStatItem(baseKey, baseData) {
                 <div class="stat-item-row">
                     <button type="button" class="stat-base-link" data-base="${baseKey}" title="Показать список документов">${label}</button>
                     <div class="stat-item-right">
+                        ${uploadBtn}
                         <button type="button" class="stat-base-reset" data-base="${baseKey}"${disabledAttr}>Сбросить</button>
                         ${recreateBtn}
                         <span class="stat-status ${baseData?.ready ? 'ready' : 'not-ready'}">
@@ -150,7 +160,7 @@ function renderStatItem(baseKey, baseData) {
                         </span>
                     </div>
                 </div>
-                <div class="stat-docs">Документов: ${baseData?.files_count || 0}</div>
+                <div class="stat-docs">Документов: ${baseData?.files_count || 0} · папка ${BASE_SOURCE_HINTS[baseKey] || ''}</div>
             </div>
         </div>
     `;
@@ -164,6 +174,58 @@ function syncStatsEditControls(statsCard) {
     statsCard.querySelectorAll('.stat-base-reset, .stat-base-recreate, .recreate-btn').forEach((btn) => {
         btn.disabled = !statsEditMode;
     });
+}
+
+function setStatsUploadStatus(message, type = 'info') {
+    const status = document.getElementById('stats-upload-status');
+    if (!status) return;
+    status.hidden = !message;
+    status.textContent = message || '';
+    status.className = `stats-upload-status stats-upload-status-${type}`;
+}
+
+function bindStatsUploadHandlers() {
+    if (document.body.dataset.statsUploadBound === '1') return;
+    document.body.dataset.statsUploadBound = '1';
+
+    document.getElementById('stats-upload-files-input')?.addEventListener('change', (event) => {
+        uploadStatsFiles(event.target.files, false).finally(() => {
+            event.target.value = '';
+        });
+    });
+    document.getElementById('stats-upload-folder-input')?.addEventListener('change', (event) => {
+        uploadStatsFiles(event.target.files, true).finally(() => {
+            event.target.value = '';
+        });
+    });
+}
+
+async function uploadStatsFiles(fileList, preserveRelativePath) {
+    const files = Array.from(fileList || []);
+    if (!files.length || !pendingStatsUploadTarget) return;
+
+    const target = pendingStatsUploadTarget;
+    const label = Object.entries(BASE_UPLOAD_TARGETS).find(([, folder]) => folder === target)?.[0];
+    const baseLabel = BASE_LABELS[label] || target;
+
+    const buttons = document.querySelectorAll('.stat-base-upload');
+    buttons.forEach((button) => { button.disabled = true; });
+    setStatsUploadStatus(`Загрузка в ${target}: ${files.length} файл(ов)...`, 'info');
+
+    try {
+        const result = await uploadFilesToFolder(target, files, { preserveRelativePath });
+        let message = result?.message || `Загружено в ${target}: ${result?.saved_count || files.length} файл(ов)`;
+        if (result?.reindex_message) {
+            message += `. ${result.reindex_message}`;
+        }
+        setStatsUploadStatus(message, 'success');
+        await updateStatsInCard();
+    } catch (error) {
+        setStatsUploadStatus(formatCaughtError(error, `Не удалось загрузить файлы в ${baseLabel}`), 'error');
+    } finally {
+        buttons.forEach((button) => { button.disabled = false; });
+        pendingStatsUploadTarget = '';
+    }
 }
 
 function initStatsCardHandlers() {
@@ -180,10 +242,18 @@ function initStatsCardHandlers() {
 
     statsCard.addEventListener('click', (e) => {
         const interactive = e.target.closest(
-            '.stats-edit-switch, .stat-base-link, .stat-base-reset, .stat-base-recreate, .recreate-btn'
+            '.stats-edit-switch, .stat-base-link, .stat-base-reset, .stat-base-recreate, .recreate-btn, .stat-base-upload'
         );
         if (interactive) {
             e.stopPropagation();
+        }
+
+        const uploadBtn = e.target.closest('.stat-base-upload');
+        if (uploadBtn) {
+            pendingStatsUploadTarget = uploadBtn.dataset.target || '';
+            if (!pendingStatsUploadTarget) return;
+            document.getElementById('stats-upload-files-input')?.click();
+            return;
         }
 
         const baseLink = e.target.closest('.stat-base-link');
@@ -301,6 +371,7 @@ async function updateStatsInCard() {
             </label>
             <div class="card-icon">📊</div>
             <h2>Статистика</h2>
+            <p class="stats-card-subtitle">Информация о готовности баз данных</p>
             <div class="stats-in-card">
                 ${renderStatItem('gost', data.gost)}
                 ${renderStatItem('fz', data.fz)}
@@ -320,7 +391,8 @@ async function updateStatsInCard() {
                 e.target.closest('.stat-base-link') ||
                 e.target.closest('.stat-item-right') ||
                 e.target.closest('.recreate-btn') ||
-                e.target.closest('.stats-modal')
+                e.target.closest('.stats-modal') ||
+                e.target.closest('.stat-base-upload')
             ) {
                 return;
             }
@@ -333,6 +405,7 @@ async function updateStatsInCard() {
             statsCard.innerHTML = `
                 <div class="card-icon">📊</div>
                 <h2>Статистика</h2>
+                <p class="stats-card-subtitle">Информация о готовности баз данных</p>
                 <p style="color: #dc3545;">${formatCaughtError(error, 'Не удалось загрузить статистику')}</p>
                 <p style="color: #666; font-size: 0.9rem;">${WND_SERVER_HINT}</p>
             `;
@@ -397,6 +470,7 @@ async function recreateBases() {
 // Инициализация при загрузке страницы
 document.addEventListener('DOMContentLoaded', async () => {
     bindStatsModalHandlers();
+    bindStatsUploadHandlers();
     initStatsCardHandlers();
     // Загружаем статистику в квадрат при загрузке страницы
     await updateStatsInCard();
