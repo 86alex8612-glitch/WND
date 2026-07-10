@@ -9,6 +9,7 @@ let mainFilename = null;
 let analysisFilename = null;
 let analysisText = null;
 let analysisAutoMatched = false;
+let reworkAnalysisSkipped = false;
 let lastReworkDocument = '';
 let lastReworkChangesReport = '';
 let lastNewDocument = '';
@@ -73,11 +74,12 @@ const CREATE_INSTRUCTION_HTML = `
         <li>На экране появятся:
             <ul>
                 <li><strong>Отчёт о переработке</strong></li>
-                <li><strong>Текст документа</strong></li>
+                <li>кнопки <strong>«Показать документ»</strong> и <strong>«Задать вопросы»</strong> — текст и диалог в одном окне</li>
             </ul>
         </li>
         <li>Действия:
             <ul>
+                <li><strong>«Показать документ»</strong> или <strong>«Задать вопросы»</strong> — открыть окно с текстом документа и диалогом вопросов;</li>
                 <li><strong>«Скачать»</strong> — сохранить DOCX на компьютер;</li>
                 <li><strong>«Задать вопросы»</strong> — открыть диалог по содержанию документа;</li>
                 <li><strong>«Завершить»</strong> — выйти на главный экран (если документ не скачан, он не сохранится на компьютере).</li>
@@ -98,7 +100,7 @@ const CREATE_INSTRUCTION_HTML = `
         <li>Используйте подсказки в правой колонке при выборе области законодательства и сферы деятельности.</li>
         <li>Нажмите <strong>«Далее»</strong>.</li>
     </ol>
-    <blockquote>В этом режиме реальный ВНД с реквизитами организации <strong>не загружается</strong>. Наименование организации в шаблоне подставляется условное (например, <code>ООО «DialgAI»</code>).</blockquote>
+    <blockquote>В этом режиме реальный ВНД с реквизитами организации <strong>не загружается</strong>. Наименование организации в шаблоне подставляется условное (например, <code>ООО «DialogAI»</code>).</blockquote>
 
     <h5>Шаг 3. Уточняющие вопросы</h5>
     <ol>
@@ -113,16 +115,17 @@ const CREATE_INSTRUCTION_HTML = `
         <li>Дождитесь формирования <strong>шаблона</strong> ВНД (отображается индикатор прогресса).</li>
         <li>Просмотрите текст шаблона на экране.</li>
         <li><strong>«Скачать»</strong> — получить DOCX-шаблон на компьютер.</li>
+        <li><strong>«Показать документ»</strong> / <strong>«Задать вопросы»</strong> — просмотр текста и диалог в одном окне.</li>
         <li><strong>«Задать вопросы»</strong> / <strong>«Завершить»</strong> — по аналогии с режимом переработки.</li>
     </ol>
     <blockquote>Перед применением в организации замените условное наименование предприятия, укажите реальные реквизиты и согласуйте текст с профильными специалистами.</blockquote>
 
     <h4>Диалог «Задать вопросы» (оба режима)</h4>
     <ol>
-        <li>Нажмите <strong>«Задать вопросы»</strong> на экране результата.</li>
-        <li>Введите вопрос в поле внизу окна и нажмите <strong>«Отправить»</strong> (или Enter).</li>
-        <li>Для сохранения переписки нажмите <strong>«Скачать»</strong> в окне диалога.</li>
-        <li>Закройте окно кнопкой <strong>«Закрыть диалог»</strong>.</li>
+        <li>Нажмите <strong>«Показать документ»</strong> или <strong>«Задать вопросы»</strong> — откроется окно: слева текст документа, справа диалог.</li>
+        <li>Введите вопрос в поле справа и нажмите <strong>«Отправить»</strong> (или Enter).</li>
+        <li>Для сохранения переписки нажмите <strong>«Скачать диалог»</strong> внизу окна.</li>
+        <li>Закройте окно кнопкой <strong>«Закрыть»</strong>.</li>
     </ol>
 `;
 
@@ -143,14 +146,65 @@ function formatDocumentWithRedMarkers(text) {
 }
 
 function renderReworkDocument(text) {
-    const el = document.getElementById('rework-result');
-    if (!el) return;
-    el.innerHTML = formatDocumentWithRedMarkers(text);
+    lastReworkDocument = text || '';
+}
+
+function openCreateDocumentModal(mode, options = {}) {
+    const text = mode === 'rework' ? lastReworkDocument : lastNewDocument;
+    if (!text) {
+        alert('Документ ещё не сформирован');
+        return;
+    }
+
+    createQaMode = mode;
+    const state = createQaState[mode];
+    if (!state.messages.length) {
+        state.messages.push({ role: 'assistant', content: CREATE_QA_WELCOME });
+    }
+
+    const body = document.getElementById('create-document-body');
+    if (body) {
+        body.innerHTML = formatDocumentWithRedMarkers(text);
+        body.scrollTop = 0;
+    }
+    const title = document.getElementById('create-document-title');
+    if (title) {
+        title.textContent = mode === 'rework' ? 'Переработанный документ' : 'Сформированный документ';
+    }
+    const subtitle = document.getElementById('create-document-subtitle');
+    if (subtitle) {
+        subtitle.textContent = `Документ: ${getCreateQaTitle(mode)}. Слева — текст, справа — диалог с вопросами.`;
+    }
+
+    renderCreateQaMessages();
+
+    const modal = document.getElementById('create-document-modal');
+    if (!modal) return;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+
+    if (options.focusChat) {
+        document.getElementById('create-qa-input')?.focus();
+    }
+}
+
+function closeCreateDocumentModal() {
+    const modal = document.getElementById('create-document-modal');
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+function downloadCreateDocumentFromModal() {
+    if (!createQaMode) return;
+    downloadCreateDocument(createQaMode, 'docx');
 }
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCreateOptions();
     updateReworkPrefillButton();
+    setupReworkFormValidationRefresh();
+    setReworkAnalysisControlsEnabled(true);
     const instructionBody = document.getElementById('create-instruction-body');
     if (instructionBody) {
         instructionBody.innerHTML = CREATE_INSTRUCTION_HTML;
@@ -257,7 +311,6 @@ function populateNewFormOptions(options) {
 
     updateLegalAreaHint();
     updateActivityHint();
-    updateNewFormSidebar();
 }
 
 function populateSelectOptions(selectId, options, selected) {
@@ -345,7 +398,6 @@ function populateReworkFormOptions(options) {
 
     updateReworkLegalAreaHint();
     updateReworkActivityHint();
-    updateReworkFormSidebar();
 }
 
 function setFieldValue(id, value) {
@@ -377,13 +429,56 @@ function closeCreateInstructionModal() {
     modal.setAttribute('aria-hidden', 'true');
 }
 
+function setReworkAnalysisControlsEnabled(enabled) {
+    const analysisInput = document.getElementById('rework-analysis-input');
+    const uploadBtn = document.getElementById('btn-rework-analysis-upload');
+    if (analysisInput) analysisInput.disabled = !enabled;
+    if (uploadBtn) uploadBtn.disabled = !enabled;
+}
+
+function isReworkAnalysisNoneChecked() {
+    return Boolean(document.getElementById('rework-analysis-none')?.checked);
+}
+
+function toggleReworkAnalysisNone() {
+    reworkAnalysisSkipped = isReworkAnalysisNoneChecked();
+    if (reworkAnalysisSkipped) {
+        analysisFilename = null;
+        analysisText = null;
+        analysisAutoMatched = false;
+        const analysisInput = document.getElementById('rework-analysis-input');
+        if (analysisInput) analysisInput.value = '';
+        setReworkAnalysisControlsEnabled(false);
+        const status = document.getElementById('rework-analysis-status');
+        if (status) {
+            status.textContent =
+                'Отчёт анализа не используется — при переработке будет выполнен автоматический анализ.';
+            status.className = 'upload-status';
+        }
+        return;
+    }
+
+    setReworkAnalysisControlsEnabled(true);
+    if (mainFilename) {
+        const originalName = document.getElementById('rework-vnd-name')?.value?.trim()
+            || mainFilename.replace(/^main_\d{8}_\d{6}_/i, '');
+        autoLoadReworkAnalysis(originalName || mainFilename);
+    } else {
+        resetReworkAnalysisState();
+    }
+}
+
 function resetReworkUploadFields() {
     const mainInput = document.getElementById('rework-main-input');
     const analysisInput = document.getElementById('rework-analysis-input');
+    const analysisNone = document.getElementById('rework-analysis-none');
     const vndName = document.getElementById('rework-vnd-name');
     const mainStatus = document.getElementById('rework-main-status');
+    reworkAnalysisSkipped = false;
     if (mainInput) mainInput.value = '';
     if (analysisInput) analysisInput.value = '';
+    if (analysisNone) analysisNone.checked = false;
+    setReworkAnalysisControlsEnabled(true);
     if (vndName) vndName.value = '';
     if (mainStatus) {
         mainStatus.textContent = '';
@@ -435,6 +530,10 @@ async function autoLoadReworkAnalysis(originalFilename) {
         resetReworkAnalysisState();
         return;
     }
+    if (isReworkAnalysisNoneChecked()) {
+        toggleReworkAnalysisNone();
+        return;
+    }
 
     if (status) {
         status.textContent = '⏳ Поиск отчёта анализа...';
@@ -450,11 +549,16 @@ async function autoLoadReworkAnalysis(originalFilename) {
         }
 
         const candidatesData = await candidatesResponse.json();
-        const best = (candidatesData.candidates || [])[0];
+        const best = candidatesData.auto_match || null;
         if (!best) {
-            resetReworkAnalysisState(
-                'Подходящий отчёт не найден — при переработке будет выполнен автоматический анализ.'
-            );
+            analysisFilename = null;
+            analysisText = null;
+            analysisAutoMatched = false;
+            if (status) {
+                status.textContent =
+                    'Файл анализа не найден. Отметьте «Нет отчёта анализа» или загрузите отчёт вручную.';
+                status.className = 'upload-status warning';
+            }
             return;
         }
 
@@ -476,9 +580,14 @@ async function autoLoadReworkAnalysis(originalFilename) {
         }
     } catch (error) {
         console.warn('Автоподбор отчёта анализа:', error);
-        resetReworkAnalysisState(
-            'Не удалось подобрать отчёт автоматически — при переработке будет выполнен автоматический анализ.'
-        );
+        analysisFilename = null;
+        analysisText = null;
+        analysisAutoMatched = false;
+        if (status) {
+            status.textContent =
+                'Файл анализа не найден. Отметьте «Нет отчёта анализа» или загрузите отчёт вручную.';
+            status.className = 'upload-status warning';
+        }
     }
 }
 
@@ -504,10 +613,12 @@ function backToCreateMenu() {
     analysisFilename = null;
     analysisText = null;
     analysisAutoMatched = false;
+    reworkAnalysisSkipped = false;
     createQaMode = null;
     createQaState.rework.messages = [];
     createQaState.new.messages = [];
     closeCreateQaModal();
+    closeCreateDocumentModal();
     leaveCreateResultView();
     document.body.classList.remove('create-new-active');
     document.body.classList.remove('create-rework-active');
@@ -547,12 +658,6 @@ function enterCreateResultView(mode) {
         document.getElementById('new-panel').style.display = 'block';
         showNewStep('document');
     }
-    requestAnimationFrame(() => {
-        const scrollEl = mode === 'rework'
-            ? document.getElementById('rework-result')
-            : document.querySelector('#new-step-document .new-document-body');
-        if (scrollEl) scrollEl.scrollTop = 0;
-    });
 }
 
 function leaveCreateResultView() {
@@ -620,7 +725,7 @@ function showReworkStep(step) {
         if (panel) panel.style.display = 'block';
         document.getElementById('new-panel').style.display = 'none';
         document.body.classList.add('create-rework-active');
-        updateReworkFormSidebar();
+        applyReworkFormValidationHighlight();
     }
 }
 
@@ -640,28 +745,6 @@ function showNewMode() {
 
 function setCreateNewLayoutActive(active) {
     document.body.classList.toggle('create-new-active', Boolean(active));
-}
-
-function updateNewFormSidebar() {
-    const sidebar = document.getElementById('new-form-sidebar-text');
-    if (!sidebar) return;
-
-    const legalHint = document.getElementById('new-legal-area-hint')?.textContent || '';
-    const activityHint = document.getElementById('new-activity-hint')?.textContent || '';
-    const parts = [];
-
-    if (legalHint) {
-        parts.push(`<strong>Область законодательства:</strong> ${escapeHtml(legalHint)}`);
-    }
-    if (activityHint) {
-        parts.push(`<strong>Сфера деятельности:</strong> ${escapeHtml(activityHint)}`);
-    }
-    if (!parts.length) {
-        sidebar.textContent =
-            'Выберите область законодательства и сферу деятельности — здесь появятся пояснения по регуляторам и типовым документам.';
-        return;
-    }
-    sidebar.innerHTML = parts.join('<br><br>');
 }
 
 function showNewStep(step) {
@@ -690,7 +773,6 @@ function showNewStep(step) {
     }
     if (step === 'form') {
         leaveCreateResultView();
-        updateNewFormSidebar();
     }
 }
 
@@ -911,7 +993,7 @@ function highlightFollowupErrors(missing) {
             if (notFound.length) {
                 errorBox.textContent = `Заполните обязательные поля: ${notFound.join('; ')}.`;
             } else {
-                errorBox.textContent = 'Ответьте на все обязательные вопросы (выделены красным).';
+                errorBox.textContent = 'Ответьте на все обязательные вопросы (подсвечены).';
                 const firstError = document.querySelector('#new-followup-fields .stage1-field.field-error');
                 firstError?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
             }
@@ -942,7 +1024,6 @@ function updateLegalAreaHint() {
     const option = select.selectedOptions[0];
     const examples = option?.dataset?.examples || '';
     hint.textContent = examples ? `Примеры: ${examples.replace(/;/g, ' · ')}` : '';
-    updateNewFormSidebar();
 }
 
 function updateActivityHint() {
@@ -951,7 +1032,6 @@ function updateActivityHint() {
     if (!select || !hint) return;
     const option = select.selectedOptions[0];
     hint.textContent = option?.dataset?.description || '';
-    updateNewFormSidebar();
 }
 
 function toggleNewCustomField(kind) {
@@ -1022,7 +1102,7 @@ function highlightNewFormErrors(missing) {
     if (errorBox) {
         if (missing?.length) {
             errorBox.style.display = 'block';
-            errorBox.textContent = 'Заполните все обязательные поля (выделены красным).';
+            errorBox.textContent = 'Заполните все обязательные поля (подсвечены).';
         } else {
             errorBox.style.display = 'none';
             errorBox.textContent = '';
@@ -1147,7 +1227,6 @@ async function runNewContinue() {
 
         createQaState.new.messages = [];
         lastNewDocument = data.document || '';
-        document.getElementById('new-result').textContent = lastNewDocument;
         enterCreateResultView('new');
     } catch (error) {
         stopProgress();
@@ -1301,12 +1380,31 @@ function highlightReworkFormErrors(missing) {
     if (errorBox) {
         if (missing?.length) {
             errorBox.style.display = 'block';
-            errorBox.textContent = 'Заполните все обязательные поля (выделены красным).';
+            errorBox.textContent = missing.length === 1
+                ? 'Не все обязательные поля заполнены автоматически — укажите недостающее значение (подсвечено).'
+                : 'Не все обязательные поля заполнены автоматически — укажите недостающие значения (подсвечены).';
         } else {
             errorBox.style.display = 'none';
             errorBox.textContent = '';
         }
     }
+}
+
+function applyReworkFormValidationHighlight() {
+    const missing = validateNewFormClient(collectReworkFormData());
+    highlightReworkFormErrors(missing);
+}
+
+function refreshReworkFormValidation() {
+    applyReworkFormValidationHighlight();
+}
+
+function setupReworkFormValidationRefresh() {
+    const form = document.getElementById('rework-step-form');
+    if (!form || form.dataset.validationBound) return;
+    form.dataset.validationBound = '1';
+    form.addEventListener('input', refreshReworkFormValidation);
+    form.addEventListener('change', refreshReworkFormValidation);
 }
 
 function updateReworkLegalAreaHint() {
@@ -1316,7 +1414,6 @@ function updateReworkLegalAreaHint() {
     const option = select.selectedOptions[0];
     const examples = option?.dataset?.examples || '';
     hint.textContent = examples ? `Примеры: ${examples.replace(/;/g, ' · ')}` : '';
-    updateReworkFormSidebar();
 }
 
 function updateReworkActivityHint() {
@@ -1325,29 +1422,6 @@ function updateReworkActivityHint() {
     if (!select || !hint) return;
     const option = select.selectedOptions[0];
     hint.textContent = option?.dataset?.description || '';
-    updateReworkFormSidebar();
-}
-
-function updateReworkFormSidebar() {
-    const sidebar = document.getElementById('rework-form-sidebar-text');
-    if (!sidebar) return;
-
-    const legalHint = document.getElementById('rework-legal-area-hint')?.textContent || '';
-    const activityHint = document.getElementById('rework-activity-hint')?.textContent || '';
-    const parts = [];
-
-    if (legalHint) {
-        parts.push(`<strong>Область законодательства:</strong> ${escapeHtml(legalHint)}`);
-    }
-    if (activityHint) {
-        parts.push(`<strong>Сфера деятельности:</strong> ${escapeHtml(activityHint)}`);
-    }
-    if (!parts.length) {
-        sidebar.textContent =
-            'Выберите область законодательства и сферу деятельности — здесь появятся пояснения.';
-        return;
-    }
-    sidebar.innerHTML = parts.join('<br><br>');
 }
 
 function toggleReworkCustomField(kind) {
@@ -1384,8 +1458,7 @@ function populateReworkForm(data) {
     setSelectValue('rework-audience', form.target_audience);
     setFieldValue('rework-audience-custom', form.target_audience_custom);
     toggleReworkCustomField('audience');
-    highlightReworkFormErrors([]);
-    updateReworkFormSidebar();
+    applyReworkFormValidationHighlight();
 }
 
 function reworkFormToStage1(form) {
@@ -1415,7 +1488,13 @@ function reworkFormToStage1(form) {
 
     const ownership = form.ownership_form || '';
     let ownershipOld = 'Частные компании';
-    if (/государствен/i.test(ownership)) {
+    if (
+        /^Федеральные/.test(ownership)
+        || /^Органы государственной власти субъектов/.test(ownership)
+        || /^Органы местного самоуправления/.test(ownership)
+        || /государствен/i.test(ownership)
+        || /муниципаль/i.test(ownership)
+    ) {
         ownershipOld = 'Государственные предприятия';
     }
 
@@ -1645,37 +1724,11 @@ function renderCreateQaMessages() {
 }
 
 function openCreateQaModal(mode) {
-    const documentText = getCreateQaDocument(mode);
-    if (!documentText) {
-        alert('Сначала сформируйте документ');
-        return;
-    }
-
-    createQaMode = mode;
-    const state = createQaState[mode];
-    if (!state.messages.length) {
-        state.messages.push({ role: 'assistant', content: CREATE_QA_WELCOME });
-    }
-
-    const subtitle = document.getElementById('create-qa-subtitle');
-    if (subtitle) {
-        subtitle.textContent = `Документ: ${getCreateQaTitle(mode)}`;
-    }
-
-    renderCreateQaMessages();
-
-    const modal = document.getElementById('create-qa-modal');
-    if (!modal) return;
-    modal.hidden = false;
-    modal.setAttribute('aria-hidden', 'false');
-    document.getElementById('create-qa-input')?.focus();
+    openCreateDocumentModal(mode, { focusChat: true });
 }
 
 function closeCreateQaModal() {
-    const modal = document.getElementById('create-qa-modal');
-    if (!modal) return;
-    modal.hidden = true;
-    modal.setAttribute('aria-hidden', 'true');
+    closeCreateDocumentModal();
 }
 
 async function sendCreateQaMessage() {
@@ -1749,6 +1802,7 @@ async function downloadCreateQaDialog() {
     }
 }
 
+window.toggleReworkAnalysisNone = toggleReworkAnalysisNone;
 window.goToReworkForm = goToReworkForm;
 window.showReworkStep = showReworkStep;
 window.runReworkFromForm = runReworkFromForm;
@@ -1773,6 +1827,9 @@ window.showNewStep = showNewStep;
 window.showExitWithoutSaveModal = showExitWithoutSaveModal;
 window.closeExitWithoutSaveModal = closeExitWithoutSaveModal;
 window.confirmExitWithoutSave = confirmExitWithoutSave;
+window.downloadCreateDocumentFromModal = downloadCreateDocumentFromModal;
+window.openCreateDocumentModal = openCreateDocumentModal;
+window.closeCreateDocumentModal = closeCreateDocumentModal;
 window.openCreateQaModal = openCreateQaModal;
 window.closeCreateQaModal = closeCreateQaModal;
 window.sendCreateQaMessage = sendCreateQaMessage;

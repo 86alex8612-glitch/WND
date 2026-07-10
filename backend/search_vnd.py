@@ -139,6 +139,33 @@ def _names_match(vnd_name: str, candidate_name: str) -> bool:
     return False
 
 
+def _names_match_strict(vnd_name: str, candidate_name: str) -> bool:
+    """Строгое сопоставление для автоподбора отчёта (без «первого попавшегося»)."""
+    vnd_key = _normalize_name_for_match(vnd_name)
+    cand_key = _normalize_name_for_match(candidate_name)
+    if not vnd_key or not cand_key:
+        return False
+    if vnd_key == cand_key:
+        return True
+
+    shorter, longer = (
+        (vnd_key, cand_key) if len(vnd_key) <= len(cand_key) else (cand_key, vnd_key)
+    )
+    if len(shorter) >= 10 and shorter in longer:
+        return True
+
+    vnd_tokens = {t for t in vnd_key.split() if len(t) >= 4}
+    cand_tokens = {t for t in cand_key.split() if len(t) >= 4}
+    if not vnd_tokens or not cand_tokens:
+        return False
+
+    shared = vnd_tokens & cand_tokens
+    if len(shared) < 2:
+        return False
+    overlap = len(shared) / max(len(vnd_tokens), len(cand_tokens), 1)
+    return overlap >= 0.6
+
+
 def _is_analysis_report_file(path: Path) -> bool:
     if not path.is_file():
         return False
@@ -190,6 +217,15 @@ def find_analysis_candidates(vnd_filename: str) -> List[dict]:
 
     candidates.sort(key=lambda item: item.get("mtime", 0), reverse=True)
     return candidates
+
+
+def find_auto_analysis_match(vnd_filename: str) -> Optional[dict]:
+    """Найти отчёт анализа для автоподстановки (только при строгом совпадении имён)."""
+    safe_vnd = os.path.basename(vnd_filename or "")
+    for item in find_analysis_candidates(safe_vnd):
+        if _names_match_strict(safe_vnd, item["filename"]):
+            return item
+    return None
 
 
 def resolve_analysis_text(filename: str, source: Optional[str] = None) -> tuple[str, str, str]:

@@ -1854,6 +1854,7 @@ async def search_analysis_candidates(vnd_filename: str = ""):
         return {
             "vnd_filename": filename,
             "candidates": find_analysis_candidates(filename),
+            "auto_match": find_auto_analysis_match(filename),
         }
     except HTTPException:
         raise

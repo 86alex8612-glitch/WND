@@ -7,7 +7,7 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Помощник в создании ВНД - НейроКонсультант</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260710b">
+    <link rel="stylesheet" href="/static/styles.css?v=20260710k">
 </head>
 <body>
     <header class="header">
@@ -59,8 +59,12 @@
                 <div class="create-upload-block">
                     <label>Отчёт анализа документа</label>
                     <p class="stage-subtitle create-upload-hint">Документы подбираются из подпапок OUT и IN. ГОСТ и ФЗ — в карточке «Статистика» на главном экране.</p>
+                    <label class="stage1-checkbox-option create-analysis-none-option">
+                        <input type="checkbox" id="rework-analysis-none" onchange="toggleReworkAnalysisNone()" />
+                        <span>Нет отчёта анализа</span>
+                    </label>
                     <input type="file" id="rework-analysis-input" accept=".pdf,.docx,.doc,.txt" />
-                    <button class="btn-primary" onclick="uploadCreateFile('analysis')">Загрузить другой отчёт</button>
+                    <button type="button" class="btn-primary" id="btn-rework-analysis-upload" onclick="uploadCreateFile('analysis')">Загрузить другой отчёт</button>
                     <div id="rework-analysis-status" class="upload-status">Отчёт будет подобран после загрузки основного документа.</div>
                 </div>
 
@@ -138,11 +142,6 @@
                                 <label for="rework-audience-custom">Укажите целевую аудиторию</label>
                                 <input type="text" id="rework-audience-custom" class="create-text-input" />
                             </div>
-
-                            <aside class="new-form-sidebar" aria-label="Подсказки">
-                                <h4>Подсказки</h4>
-                                <p id="rework-form-sidebar-text">Выберите область законодательства и сферу деятельности — здесь появятся пояснения.</p>
-                            </aside>
                         </div>
                     </div>
 
@@ -161,7 +160,9 @@
                     <h4 class="create-result-subheading">Отчёт о переработке</h4>
                     <div id="rework-changes-report" class="analysis-result create-changes-report"></div>
                     <h4 class="create-result-subheading">Текст документа</h4>
-                    <div id="rework-result" class="analysis-result create-result-text"></div>
+                    <div class="create-document-preview-actions">
+                        <button type="button" class="btn-secondary btn-show-document" onclick="openCreateDocumentModal('rework')">Показать документ</button>
+                    </div>
                     <div class="stage-footer-buttons create-result-actions">
                         <button class="btn-primary" onclick="downloadCreateDocument('rework', 'docx')">Скачать</button>
                         <button class="btn-secondary" onclick="openCreateQaModal('rework')">Задать вопросы</button>
@@ -236,11 +237,6 @@
                                 <label for="new-audience-custom">Укажите целевую аудиторию</label>
                                 <input type="text" id="new-audience-custom" class="create-text-input" />
                             </div>
-
-                            <aside class="new-form-sidebar" aria-label="Подсказки">
-                                <h4>Подсказки</h4>
-                                <p id="new-form-sidebar-text">Выберите область законодательства и сферу деятельности — здесь появятся пояснения по регуляторам и типовым документам.</p>
-                            </aside>
                         </div>
                     </div>
 
@@ -279,8 +275,10 @@
 
                 <div id="new-step-document" class="create-step new-form-step new-document-step" style="display: none;">
                     <div id="new-generate-progress" class="stage1-note stage1-note-progress" style="display: none;"></div>
-                    <div class="new-document-body">
-                        <div id="new-result" class="analysis-result create-result-text"></div>
+                    <h4>Результат формирования</h4>
+                    <h4 class="create-result-subheading">Сформированный документ</h4>
+                    <div class="create-document-preview-actions">
+                        <button type="button" class="btn-secondary btn-show-document" onclick="openCreateDocumentModal('new')">Показать документ</button>
                     </div>
                     <div class="stage-footer-buttons create-result-actions">
                         <button class="btn-primary" onclick="downloadCreateDocument('new', 'docx')">Скачать</button>
@@ -321,19 +319,31 @@
         </div>
     </div>
 
-    <div id="create-qa-modal" class="create-modal" hidden aria-hidden="true">
-        <div class="create-modal-backdrop" onclick="closeCreateQaModal()"></div>
-        <div class="create-modal-dialog create-qa-dialog" role="dialog" aria-labelledby="create-qa-title">
-            <h3 id="create-qa-title">Вопросы по документу</h3>
-            <p id="create-qa-subtitle" class="create-modal-text"></p>
-            <div id="create-qa-messages" class="chat-messages create-qa-messages"></div>
-            <div class="chat-input-container create-qa-input-row">
-                <textarea id="create-qa-input" rows="2" placeholder="Ваш вопрос по подготовленному документу..."></textarea>
-                <button class="btn-primary" id="btn-create-qa-send" onclick="sendCreateQaMessage()">Отправить</button>
+    <div id="create-document-modal" class="create-modal" hidden aria-hidden="true">
+        <div class="create-modal-backdrop" onclick="closeCreateDocumentModal()"></div>
+        <div class="create-modal-dialog create-document-dialog" role="dialog" aria-labelledby="create-document-title">
+            <div class="create-document-header">
+                <h3 id="create-document-title">Сформированный документ</h3>
+                <p id="create-document-subtitle" class="create-modal-text"></p>
             </div>
-            <div class="create-modal-actions create-qa-footer">
-                <button class="btn-secondary" onclick="closeCreateQaModal()">Закрыть диалог</button>
-                <button class="btn-primary" onclick="downloadCreateQaDialog()">Скачать</button>
+            <div class="create-document-workspace">
+                <section class="create-document-panel" aria-label="Текст документа">
+                    <h4>Текст документа</h4>
+                    <div id="create-document-body" class="create-document-body"></div>
+                </section>
+                <section class="create-document-qa-panel" aria-label="Вопросы по документу">
+                    <h4>Вопросы по документу</h4>
+                    <div id="create-qa-messages" class="chat-messages create-qa-messages"></div>
+                    <div class="chat-input-container create-qa-input-row">
+                        <textarea id="create-qa-input" rows="2" placeholder="Ваш вопрос по подготовленному документу..."></textarea>
+                        <button class="btn-primary" id="btn-create-qa-send" onclick="sendCreateQaMessage()">Отправить</button>
+                    </div>
+                </section>
+            </div>
+            <div class="create-modal-actions create-document-footer">
+                <button class="btn-secondary" onclick="closeCreateDocumentModal()">Закрыть</button>
+                <button class="btn-primary" id="btn-create-doc-download" onclick="downloadCreateDocumentFromModal()">Скачать документ</button>
+                <button class="btn-primary" onclick="downloadCreateQaDialog()">Скачать диалог</button>
             </div>
         </div>
     </div>
@@ -341,6 +351,6 @@
     <script src="/static/errors.js"></script>
     <script src="/static/config-ui.js?v=20260805"></script>
     <script src="/static/downloads.js"></script>
-    <script src="/static/create.js?v=20260710b"></script>
+    <script src="/static/create.js?v=20260710k"></script>
 </body>
 </html>

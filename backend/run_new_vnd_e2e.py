@@ -17,7 +17,7 @@ PAYLOAD = {
     "document_name": "Политика обработки персональных данных",
     "document_topic": (
         "Регламентация сбора, хранения, обработки и защиты персональных данных "
-        "сотрудников и клиентов ООО «DialgAI»"
+        "сотрудников и клиентов ООО «DialogAI»"
     ),
     "legal_area": "personal_data",
     "activity_sphere": "it_telecom",
@@ -63,7 +63,7 @@ def main() -> int:
 
     print("=== E2E: Создать новый ВНД ===")
     print("Форма:", PAYLOAD["document_name"])
-    print("Организация: ООО «DialgAI» (из формы собственности)")
+    print("Организация: ООО «DialogAI» (из формы собственности)")
 
     t0 = time.time()
     print("\n[1/2] Анализ...")

@@ -91,6 +91,11 @@ OWNERSHIP_FORMS = [
         "Автономные некоммерческие организации (АНО)",
         "Потребительские кооперативы (Включая КПК в финансовом секторе)",
     ]},
+    {"group": "Государственный и муниципальный сектор", "options": [
+        "Федеральные органы государственной власти",
+        "Органы государственной власти субъектов РФ",
+        "Органы местного самоуправления (муниципальные органы)",
+    ]},
 ]
 
 TARGET_AUDIENCES = [
@@ -101,11 +106,11 @@ TARGET_AUDIENCES = [
     {"id": "custom", "label": "Указать своё", "custom": True},
 ]
 
-ORG_BRAND_NAME = "DialgAI"
+ORG_BRAND_NAME = "DialogAI"
 
 
 def build_organization_name(ownership_form: str) -> str:
-    """Наименование организации для текста ВНД: форма собственности + DialgAI."""
+    """Наименование организации для текста ВНД: форма собственности + DialogAI."""
     form = (ownership_form or "").strip()
     brand = ORG_BRAND_NAME
 
@@ -127,6 +132,12 @@ def build_organization_name(ownership_form: str) -> str:
         return f"АНО «{brand}»"
     if form.startswith("Потребительские"):
         return f"Потребительский кооператив «{brand}»"
+    if form.startswith("Федеральные"):
+        return f"Федеральный орган государственной власти «{brand}»"
+    if form.startswith("Органы государственной власти субъектов"):
+        return f"Орган государственной власти субъекта РФ «{brand}»"
+    if form.startswith("Органы местного самоуправления"):
+        return f"Орган местного самоуправления «{brand}»"
 
     prefix = form.split("(")[0].strip() if form else "ООО"
     if len(prefix) > 40:
