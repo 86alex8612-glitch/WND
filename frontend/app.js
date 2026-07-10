@@ -10,7 +10,7 @@ function openAnalizPage() {
 }
 
 function openCreatePage() {
-    window.location.href = '/create';
+    window.location.href = `/create?v=${Date.now()}`;
 }
 
 function openSearchPage() {

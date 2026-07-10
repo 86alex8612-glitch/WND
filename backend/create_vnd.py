@@ -90,6 +90,7 @@ REWORK_PROMPT = """Ты — старший юрисконсульт методи
 ДОПОЛНИТЕЛЬНО:
 - Проверь актуальность ссылок на ФЗ; замени устаревшие.
 - Дату утверждения — маскированная текущая дата (**********, по одному * на символ ДД.ММ.ГГГГ).
+- Год утверждения/введения в действие — только текущий календарный год (не копируй год из исходного документа).
 - ФИО, названия организаций, реквизиты — символ * (по одному * на каждый символ).
 
 ФОРМАТ ОТВЕТА: только полный текст переработанного ВНД от названия до заключительных положений. Без комментариев «что изменено». Маркеры <<RED>>…<<ENDRED>> включай в текст статьи как указано выше."""
@@ -128,6 +129,7 @@ NEW_VND_PROMPT = """Ты — эксперт по организационно-р
 - применимые федеральные законы из контекста;
 - требования ГОСТ Р 7.0.97-2025 к оформлению ОРД;
 - дату создания/утверждения документа указывай маскированной текущей датой (********** — по одному * на символ формата ДД.ММ.ГГГГ).
+- год утверждения/введения в действие указывай текущим календарным годом.
 
 Документ должен быть структурированным, юридически корректным и готовым к согласованию.
 Формат ответа: полный текст документа (без пояснений вне документа)."""
@@ -175,6 +177,7 @@ NEW_VND_GENERATION_PROMPT = """Ты — высококвалифицирован
 - Конкретные ФИО должностных лиц — указывай должность («Генеральный директор», «Ответственный за обработку ПДн») без вымышленных ФИО.
 - Адреса, ИНН, ОГРН, КПП, банковские реквизиты, телефоны, e-mail — не выдумывай; для таких сведений используй маркер: <<RED>>Необходимо указать самостоятельно [что именно].<<ENDRED>>
 - Дату утверждения указывай маскированной текущей датой (********** — по одному * на символ ДД.ММ.ГГГГ).
+- Год утверждения/введения в действие — текущий календарный год.
 
 ОБЪЁМ И ПОЛНОТА:
 - Документ должен быть ПОЛНЫМ локальным актом, а не кратким шаблоном.
@@ -520,12 +523,267 @@ def analyze_for_rework(
     }
 
 
-def detect_rework_stage1(main_filename: str, vnd_name: str) -> dict:
+def detect_rework_stage1(
+    main_filename: str,
+    vnd_name: str,
+    analysis_text: str = "",
+    analysis_filename: str = "",
+) -> dict:
     from pre_analysis import detect_stage1
 
     main_text = read_create_file(main_filename)
     safe_name = os.path.basename(main_filename)
-    return detect_stage1(safe_name, vnd_name or safe_name, main_text)
+    combined = main_text
+    extra = (analysis_text or "").strip()
+    if not extra and analysis_filename:
+        try:
+            extra = read_create_file(analysis_filename)
+        except Exception:
+            extra = ""
+    if extra:
+        combined = f"{main_text}\n\n--- Отчёт анализа ---\n{extra[:12000]}"
+    return detect_stage1(safe_name, vnd_name or safe_name, combined)
+
+
+_OLD_SPHERE_TO_FORM_ID = {
+    "Производство": "manufacturing",
+    "Торговля": "trade_services",
+    "Услуги": "trade_services",
+    "Финансы": "finance",
+    "Строительство": "construction_realestate",
+    "Сельское хозяйство": "manufacturing",
+    "Информационные технологии (IT)": "it_telecom",
+    "Посредническая деятельность": "trade_services",
+    "Образовательные услуги": "social",
+    "Медицинские услуги": "social",
+    "Другое": "trade_services",
+}
+
+_FORM_ID_TO_OLD_SPHERE = {
+    "finance": "Финансы",
+    "it_telecom": "Информационные технологии (IT)",
+    "trade_services": "Услуги",
+    "manufacturing": "Производство",
+    "construction_realestate": "Строительство",
+    "social": "Образовательные услуги",
+}
+
+_OLD_LEGAL_TO_FORM_ID = {
+    "Персональные данные": "personal_data",
+    "Информационная безопасность": "confidentiality_ib",
+    "Безопасность финансовых (банковских) операций": "finance_risks",
+    "Трудовое законодательство": "labor",
+    "Противодействие коррупции": "compliance_ethics",
+    "Коммерческая тайна": "confidentiality_ib",
+    "Государственная тайна": "confidentiality_ib",
+    "Образовательная деятельность": "social",
+    "Медицинская деятельность": "social",
+    "Закупки и контрактная система": "contracts_procurement",
+    "Другое": "custom",
+}
+
+_FORM_ID_TO_OLD_LEGAL = {
+    "corporate": "Другое",
+    "personal_data": "Персональные данные",
+    "confidentiality_ib": "Информационная безопасность",
+    "labor": "Трудовое законодательство",
+    "contracts_procurement": "Закупки и контрактная система",
+    "finance_risks": "Безопасность финансовых (банковских) операций",
+    "compliance_ethics": "Противодействие коррупции",
+    "custom": "Другое",
+}
+
+
+def _read_rework_combined_text(
+    main_filename: str,
+    vnd_name: str = "",
+    analysis_text: str = "",
+    analysis_filename: str = "",
+) -> tuple[str, str]:
+    main_text = read_create_file(main_filename)
+    safe_name = os.path.basename(main_filename)
+    combined = main_text
+    extra = (analysis_text or "").strip()
+    if not extra and analysis_filename:
+        try:
+            extra = read_create_file(analysis_filename)
+        except Exception:
+            extra = ""
+    if extra:
+        combined = f"{main_text}\n\n--- Отчёт анализа ---\n{extra[:12000]}"
+    return combined, vnd_name or safe_name
+
+
+def _guess_document_topic(text: str, vnd_name: str) -> str:
+    import re
+
+    name = (vnd_name or "").strip()
+    if name and len(name) > 8:
+        return f"Внутренний нормативный документ: {name[:200]}"
+    for pattern in (
+        r"(?i)(положение|политика|регламент|инструкция|порядок)[^\n]{0,120}",
+        r"(?i)назначение документа[:\s\-–]+([^\n]{10,200})",
+        r"(?i)тема[:\s\-–]+([^\n]{10,200})",
+    ):
+        match = re.search(pattern, text[:8000])
+        if match:
+            value = (match.group(1) if match.lastindex else match.group(0)).strip()
+            if len(value) > 10:
+                return value[:300]
+    snippet = " ".join(text.split())[:220].strip()
+    return snippet or "Внутренний нормативный документ организации"
+
+
+def _guess_employees_count(text: str) -> str:
+    import re
+
+    match = re.search(
+        r"(?i)(?:численност\w*|сотрудник\w*|работник\w*)[^\d]{0,20}(\d{1,6})",
+        text[:12000],
+    )
+    return match.group(1) if match else ""
+
+
+def _guess_branches(text: str) -> str:
+    import re
+
+    if re.search(r"(?i)филиал", text[:12000]):
+        match = re.search(r"(?i)(\d+\s+филиал\w*|филиал\w*[^\n]{0,80})", text[:12000])
+        return (match.group(1) if match else "Есть филиалы/представительства")[:200]
+    if re.search(r"(?i)представительств", text[:12000]):
+        return "Есть представительства"
+    return ""
+
+
+def _guess_state_secret(text: str) -> str:
+    import re
+
+    if re.search(r"(?i)гостайн|государственн\w*\s+тайн", text[:12000]):
+        return "yes"
+    return "no"
+
+
+def _guess_target_audience(text: str) -> str:
+    import re
+
+    lower = text[:12000].lower()
+    if "клиент" in lower and ("сотрудник" in lower or "работник" in lower):
+        return "employees_clients"
+    if "руководител" in lower or "подразделен" in lower:
+        return "managers"
+    if "клиент" in lower or "контрагент" in lower:
+        return "clients"
+    return "all_employees"
+
+
+def _map_legal_areas_to_form_id(legal_areas: list) -> tuple[str, str]:
+    for area in legal_areas or []:
+        form_id = _OLD_LEGAL_TO_FORM_ID.get(area)
+        if form_id and form_id != "custom":
+            return form_id, ""
+    if legal_areas:
+        return "custom", legal_areas[0]
+    return "", ""
+
+
+def _guess_ownership_form_new(text: str, old_ownership: str) -> str:
+    import re
+
+    patterns = [
+        (r"(?i)\bООО\b", "ООО (Общество с ограниченной ответственностью)"),
+        (r"(?i)\bПАО\b", "ПАО (Публичное акционерное общество)"),
+        (r"(?i)\bАО\b", "АО (Непубличное) (Акционерное общество)"),
+        (r"(?i)\bИП\b", "ИП (Индивидуальный предприниматель)"),
+        (r"(?i)государственн\w*\s+(?:предприяти|учрежден|организаци)", "ООО (Общество с ограниченной ответственностью)"),
+    ]
+    for pattern, value in patterns:
+        if re.search(pattern, text[:8000]):
+            return value
+    if old_ownership == "Государственные предприятия":
+        return "ООО (Общество с ограниченной ответственностью)"
+    return "ООО (Общество с ограниченной ответственностью)"
+
+
+def detect_rework_form_prefill(
+    main_filename: str,
+    vnd_name: str,
+    analysis_text: str = "",
+    analysis_filename: str = "",
+) -> dict:
+    """Параметры этапа 1 + предзаполненная анкета (как «Создать новый»)."""
+    from new_vnd_form import get_new_vnd_form_options
+
+    combined, doc_name = _read_rework_combined_text(
+        main_filename, vnd_name, analysis_text, analysis_filename
+    )
+    stage1 = detect_rework_stage1(
+        main_filename, vnd_name, analysis_text, analysis_filename
+    )
+
+    activity_id = _OLD_SPHERE_TO_FORM_ID.get(stage1.get("activity_sphere") or "", "")
+    legal_id, legal_custom = _map_legal_areas_to_form_id(stage1.get("legal_areas") or [])
+
+    clean_name = doc_name
+    if "." in clean_name:
+        clean_name = os.path.splitext(clean_name)[0]
+
+    form = {
+        "document_name": clean_name,
+        "document_topic": _guess_document_topic(combined, clean_name),
+        "legal_area": legal_id,
+        "legal_area_custom": legal_custom,
+        "activity_sphere": activity_id,
+        "ownership_form": _guess_ownership_form_new(
+            combined, stage1.get("ownership_form") or ""
+        ),
+        "state_secret": _guess_state_secret(combined),
+        "employees_count": _guess_employees_count(combined),
+        "branches": _guess_branches(combined),
+        "target_audience": _guess_target_audience(combined),
+        "target_audience_custom": "",
+    }
+
+    needs_user = list(stage1.get("needs_user_input") or [])
+    for field, value in form.items():
+        if field.endswith("_custom"):
+            continue
+        if not value:
+            needs_user.append(field)
+
+    return {
+        **stage1,
+        "form": form,
+        "options": get_new_vnd_form_options(),
+        "needs_user_input": sorted(set(needs_user)),
+    }
+
+
+def rework_form_to_stage1(form: dict) -> dict:
+    """Преобразовать анкету переработки в параметры этапа 1 для анализа."""
+    from pre_analysis import normalize_stage1_answers
+
+    legal_area = (form.get("legal_area") or "").strip()
+    if legal_area == "custom":
+        legal_label = (form.get("legal_area_custom") or "").strip() or "Другое"
+    else:
+        legal_label = _FORM_ID_TO_OLD_LEGAL.get(legal_area, "Другое")
+
+    activity_id = (form.get("activity_sphere") or "").strip()
+    activity_label = _FORM_ID_TO_OLD_SPHERE.get(activity_id, "Другое")
+
+    ownership = (form.get("ownership_form") or "").strip()
+    if ownership.startswith("ООО") or ownership.startswith("АО") or ownership.startswith("ПАО") or ownership.startswith("ИП"):
+        ownership_old = "Частные компании"
+    elif "государствен" in ownership.lower():
+        ownership_old = "Государственные предприятия"
+    else:
+        ownership_old = "Частные компании"
+
+    return normalize_stage1_answers({
+        "activity_sphere": activity_label,
+        "ownership_form": ownership_old,
+        "legal_areas": [legal_label] if legal_label else ["Другое"],
+    })
 
 
 def _masked_current_date() -> str:
@@ -534,9 +792,27 @@ def _masked_current_date() -> str:
     return "*" * len(current)
 
 
+def _current_calendar_year() -> str:
+    return str(datetime.now().year)
+
+
+def _is_law_reference_year(line: str, match_start: int) -> bool:
+    """Год в контексте ссылки на НПА — не трогаем."""
+    window = line[max(0, match_start - 50): match_start + 30].lower()
+    if re.search(r"\d{1,2}\.\d{1,2}\.\d{4}", window):
+        return True
+    if re.search(
+        r"(?:федеральн\w*\s+закон|фз[\s\-№]|закон\s+рф|кодекс|постановлен|гост\s*р?|№\s*\d)",
+        window,
+    ):
+        return True
+    return False
+
+
 def _replace_document_creation_dates(text: str) -> str:
-    """Заменить дату создания/утверждения документа на маскированную текущую дату."""
+    """Заменить даты/годы утверждения документа на текущие или маскированные значения."""
     masked = _masked_current_date()
+    current_year = _current_calendar_year()
     months = (
         "января|февраля|марта|апреля|мая|июня|"
         "июля|августа|сентября|октября|ноября|декабря"
@@ -577,7 +853,48 @@ def _replace_document_creation_dates(text: str) -> str:
     for pattern in patterns:
         result = re.sub(pattern, r"\1" + masked, result)
 
-    return result
+    # «___»____________2019г. и аналогичные шаблоны с подчёркиваниями/звёздочками
+    result = re.sub(
+        r"(?i)([«""][^»""\n]*[_]+[^»""\n]*[»""][^\d\n]{0,60})((?:19|20)\d{2})(\s*г\.?)",
+        lambda m: m.group(1) + current_year + m.group(3),
+        result,
+    )
+    result = re.sub(
+        r"(?i)([_*\s]{4,})((?:19|20)\d{2})(\s*г\.?)",
+        lambda m: m.group(1) + current_year + m.group(3),
+        result,
+    )
+    result = re.sub(
+        r"(?i)(\*{3,}\s*,\s*)((?:19|20)\d{2})(\s*г\.?)",
+        lambda m: m.group(1) + current_year + m.group(3),
+        result,
+    )
+
+    meta_keywords = re.compile(
+        r"(?i)(протокол|утвержден|правлен|редакци|введен|в\s+действие|политик|утверждающ)"
+    )
+    year_pattern = re.compile(r"(?i)((?:19|20)\d{2})(\s*г\.?)")
+
+    lines = result.split("\n")
+    updated_lines = []
+    for index, line in enumerate(lines):
+        in_header_zone = index < 100
+        has_placeholders = bool(re.search(r"[*_]{3,}|«[_\s]+»", line))
+        if not (meta_keywords.search(line) or (in_header_zone and has_placeholders)):
+            updated_lines.append(line)
+            continue
+
+        def _replace_meta_year(match: re.Match) -> str:
+            year = match.group(1)
+            if year == current_year:
+                return match.group(0)
+            if _is_law_reference_year(line, match.start()):
+                return match.group(0)
+            return current_year + match.group(2)
+
+        updated_lines.append(year_pattern.sub(_replace_meta_year, line))
+
+    return "\n".join(updated_lines)
 
 
 def _mask_fragment(text: str, fragment: str) -> str:
@@ -1216,12 +1533,13 @@ def _assemble_document_header(form: dict) -> str:
 
 def _assemble_document_footer(form: dict) -> str:
     org = form.get("organization_name") or "Организация"
+    year = _current_calendar_year()
     return (
         f"\n\n---\n\nУтверждено:\n"
         f"Генеральный директор {org}\n"
-        f"«___» ____________ 20**__**\n"
+        f"«___» ____________ {year}г.\n"
         f"(подпись)\n\n"
-        f"Дата утверждения: **********\n"
+        f"Дата утверждения: {_masked_current_date()}\n"
     )
 
 
@@ -1521,22 +1839,9 @@ def generate_rework_from_analysis(
             doc_title,
         )
         gen["changes_report"] = changes_report
-        gen["saved_changes_report"] = save_rework_changes_report(changes_report, doc_title)
     except Exception as exc:
         logger.warning("Не удалось подготовить отчёт о переработке: %s", exc)
         gen["changes_report"] = ""
-        gen["saved_changes_report"] = {"status": "error", "message": str(exc)}
-
-    try:
-        gen["saved_file"] = save_generated_document(
-            gen["document"],
-            doc_title,
-            fmt="docx",
-            output_folder=settings.new_doc_folder,
-        )
-    except Exception as exc:
-        logger.warning("Не удалось сохранить переработанный документ в new-doc: %s", exc)
-        gen["saved_file"] = {"status": "error", "message": str(exc)}
 
     return gen
 

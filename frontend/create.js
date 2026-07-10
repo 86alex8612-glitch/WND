@@ -9,12 +9,12 @@ let mainFilename = null;
 let analysisFilename = null;
 let analysisText = null;
 let analysisAutoMatched = false;
-let reworkStage1Data = null;
 let lastReworkDocument = '';
 let lastReworkChangesReport = '';
 let lastNewDocument = '';
 let newFlowState = { form: null, followup_answers: {}, analysis: '', laws: [], download_result: null };
-let reworkStage1Ready = false;
+let reworkFormReady = false;
+let reworkFormState = null;
 let progressInterval = null;
 let createQaMode = null;
 let createQaSending = false;
@@ -25,6 +25,106 @@ const createQaState = {
 const CREATE_QA_WELCOME =
     'Здравствуйте! Задайте вопрос по подготовленному документу — ' +
     'поясню статьи, структуру, правовые основания и места для самостоятельного заполнения.';
+
+const CREATE_INSTRUCTION_HTML = `
+    <p><strong>ВНД</strong> — внутренний нормативный документ организации. Помощник работает в двух режимах:</p>
+    <ul>
+        <li><strong>Переработка</strong> — загрузите документ и отчёт анализа (подберётся автоматически). Параметры заполнятся из файлов, затем система сформирует улучшенный текст и отчёт об изменениях.</li>
+        <li><strong>Новый документ</strong> — пошаговая анкета, правовой анализ и генерация шаблона ВНД.</li>
+    </ul>
+    <p>Нормативная база (ГОСТ и ФЗ) загружается в карточке «Статистика» на главном экране. Готовый результат можно скачать на ваш компьютер.</p>
+    <p><strong>Переработка по шагам:</strong> загрузите основной документ → проверьте подобранный отчёт анализа и автозаполненные параметры → нажмите «Начать переработку». Если отчёта нет, будет выполнен автоматический правовой анализ.</p>
+    <p><strong>Подробнее ..</strong></p>
+
+    <h4>6.1. Режим «Переработать документ»</h4>
+
+    <h5>Шаг 1. Выбор режима</h5>
+    <ol>
+        <li>Откройте карточку <strong>«Помощник в создании ВНД»</strong> на главном экране.</li>
+        <li>Нажмите <strong>«Переработать документ»</strong>.</li>
+    </ol>
+
+    <h5>Шаг 2. Подготовка документа</h5>
+    <ol>
+        <li>В блоке <strong>«Подготовка документа»</strong> нажмите <strong>«Выберите файл»</strong> в поле основного документа (или выберите файл в стандартном диалоге).</li>
+        <li>Нажмите <strong>«Загрузить»</strong> рядом с полем основного документа.</li>
+        <li>Убедитесь, что статус загрузки показывает успех (✓).</li>
+        <li>При необходимости уточните <strong>«Название документа»</strong> в текстовом поле.</li>
+        <li>Дождитесь автоматического подбора <strong>отчёта анализа</strong> (по имени файла из папок OUT и IN).
+            <ul>
+                <li>Если подходящий отчёт не найден, система выполнит <strong>автоматический правовой анализ</strong> при переработке.</li>
+                <li>Чтобы использовать другой отчёт, выберите файл и нажмите <strong>«Загрузить другой отчёт»</strong>.</li>
+            </ul>
+        </li>
+        <li>Нажмите <strong>«Начать предварительный анализ»</strong> (кнопка активна после успешной загрузки основного документа).</li>
+    </ol>
+    <blockquote><strong>Обезличивание:</strong> основной документ при чтении с сервера (папка IN/create) автоматически обезличивается перед анализом и генерацией.</blockquote>
+
+    <h5>Шаг 3. Анкета параметров</h5>
+    <ol>
+        <li>Проверьте автоматически заполненные поля (9 пунктов: название, тема, область законодательства, сфера деятельности, форма собственности, гостайна, численность, филиалы, аудитория).</li>
+        <li>Исправьте неточности; обращайте внимание на подсветку обязательных полей.</li>
+        <li>Нажмите <strong>«Начать переработку»</strong>.</li>
+    </ol>
+
+    <h5>Шаг 4. Ожидание и результат</h5>
+    <ol>
+        <li>Дождитесь завершения процесса (при отсутствии отчёта сначала выполняется правовой анализ, затем генерация — это может занять несколько минут).</li>
+        <li>На экране появятся:
+            <ul>
+                <li><strong>Отчёт о переработке</strong></li>
+                <li><strong>Текст документа</strong></li>
+            </ul>
+        </li>
+        <li>Действия:
+            <ul>
+                <li><strong>«Скачать»</strong> — сохранить DOCX на компьютер;</li>
+                <li><strong>«Задать вопросы»</strong> — открыть диалог по содержанию документа;</li>
+                <li><strong>«Завершить»</strong> — выйти на главный экран (если документ не скачан, он не сохранится на компьютере).</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h4>6.2. Режим «Создать новый»</h4>
+
+    <h5>Шаг 1. Выбор режима</h5>
+    <ol>
+        <li>На стартовом экране помощника нажмите <strong>«Создать новый»</strong>.</li>
+    </ol>
+
+    <h5>Шаг 2. Основная анкета</h5>
+    <ol>
+        <li>Заполните все 9 полей (название, тема, область законодательства, сфера деятельности, форма собственности, отношение к гостайне, численность сотрудников, филиалы, целевая аудитория).</li>
+        <li>Используйте подсказки в правой колонке при выборе области законодательства и сферы деятельности.</li>
+        <li>Нажмите <strong>«Далее»</strong>.</li>
+    </ol>
+    <blockquote>В этом режиме реальный ВНД с реквизитами организации <strong>не загружается</strong>. Наименование организации в шаблоне подставляется условное (например, <code>ООО «DialgAI»</code>).</blockquote>
+
+    <h5>Шаг 3. Уточняющие вопросы</h5>
+    <ol>
+        <li>Ответьте на дополнительные вопросы (зависят от выбранной области законодательства: трансграничная передача, основания обработки ПДн и др.).</li>
+        <li>Нажмите <strong>«Начать анализ»</strong>.</li>
+        <li>Дождитесь <strong>результата правового анализа</strong> вводных данных.</li>
+        <li>Нажмите <strong>«Продолжить»</strong> для генерации шаблона.</li>
+    </ol>
+
+    <h5>Шаг 4. Генерация и результат</h5>
+    <ol>
+        <li>Дождитесь формирования <strong>шаблона</strong> ВНД (отображается индикатор прогресса).</li>
+        <li>Просмотрите текст шаблона на экране.</li>
+        <li><strong>«Скачать»</strong> — получить DOCX-шаблон на компьютер.</li>
+        <li><strong>«Задать вопросы»</strong> / <strong>«Завершить»</strong> — по аналогии с режимом переработки.</li>
+    </ol>
+    <blockquote>Перед применением в организации замените условное наименование предприятия, укажите реальные реквизиты и согласуйте текст с профильными специалистами.</blockquote>
+
+    <h4>Диалог «Задать вопросы» (оба режима)</h4>
+    <ol>
+        <li>Нажмите <strong>«Задать вопросы»</strong> на экране результата.</li>
+        <li>Введите вопрос в поле внизу окна и нажмите <strong>«Отправить»</strong> (или Enter).</li>
+        <li>Для сохранения переписки нажмите <strong>«Скачать»</strong> в окне диалога.</li>
+        <li>Закройте окно кнопкой <strong>«Закрыть диалог»</strong>.</li>
+    </ol>
+`;
 
 function escapeHtml(text) {
     return String(text)
@@ -50,7 +150,11 @@ function renderReworkDocument(text) {
 
 document.addEventListener('DOMContentLoaded', () => {
     loadCreateOptions();
-    updateReworkStartButton();
+    updateReworkPrefillButton();
+    const instructionBody = document.getElementById('create-instruction-body');
+    if (instructionBody) {
+        instructionBody.innerHTML = CREATE_INSTRUCTION_HTML;
+    }
     const qaInput = document.getElementById('create-qa-input');
     if (qaInput) {
         qaInput.addEventListener('keydown', (event) => {
@@ -67,9 +171,8 @@ async function loadCreateOptions() {
         const response = await fetch(`${API_BASE}/api/create/options?t=${Date.now()}`);
         if (!response.ok) return;
         createOptions = await response.json();
-        populateSelectOptions('rework-activity', createOptions.activity_spheres);
-        populateSelectOptions('rework-ownership', createOptions.ownership_forms);
         populateNewFormOptions(createOptions.new_document);
+        populateReworkFormOptions(createOptions.new_document);
     } catch (error) {
         console.warn('Не удалось загрузить справочники:', error);
     }
@@ -170,9 +273,149 @@ function populateSelectOptions(selectId, options, selected) {
     });
 }
 
-function updateReworkStartButton() {
-    const btn = document.getElementById('btn-rework-start');
+function updateReworkPrefillButton() {
+    const btn = document.getElementById('btn-rework-prefill');
     if (btn) btn.disabled = !mainFilename;
+}
+
+function populateReworkFormOptions(options) {
+    if (!options) return;
+
+    const legalSelect = document.getElementById('rework-legal-area');
+    if (legalSelect) {
+        legalSelect.innerHTML = '<option value="">— Выберите область —</option>';
+        (options.legal_areas || []).forEach((item) => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = item.label;
+            opt.dataset.examples = item.examples || '';
+            legalSelect.appendChild(opt);
+        });
+    }
+
+    const activitySelect = document.getElementById('rework-activity');
+    if (activitySelect) {
+        activitySelect.innerHTML = '<option value="">— Выберите сферу —</option>';
+        (options.activity_spheres || []).forEach((item) => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = item.label;
+            opt.dataset.description = item.description || '';
+            activitySelect.appendChild(opt);
+        });
+    }
+
+    const ownershipSelect = document.getElementById('rework-ownership');
+    if (ownershipSelect) {
+        ownershipSelect.innerHTML = '<option value="">— Выберите форму —</option>';
+        (options.ownership_forms || []).forEach((group) => {
+            const optgroup = document.createElement('optgroup');
+            optgroup.label = group.group || '';
+            (group.options || []).forEach((value) => {
+                const opt = document.createElement('option');
+                opt.value = value;
+                opt.textContent = value;
+                optgroup.appendChild(opt);
+            });
+            ownershipSelect.appendChild(optgroup);
+        });
+    }
+
+    const secretSelect = document.getElementById('rework-state-secret');
+    if (secretSelect) {
+        secretSelect.innerHTML = '<option value="">— Выберите —</option>';
+        (options.state_secret_options || []).forEach((item) => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = item.label;
+            secretSelect.appendChild(opt);
+        });
+    }
+
+    const audienceSelect = document.getElementById('rework-audience');
+    if (audienceSelect) {
+        audienceSelect.innerHTML = '<option value="">— Выберите аудиторию —</option>';
+        (options.target_audiences || []).forEach((item) => {
+            const opt = document.createElement('option');
+            opt.value = item.id;
+            opt.textContent = item.label;
+            audienceSelect.appendChild(opt);
+        });
+    }
+
+    updateReworkLegalAreaHint();
+    updateReworkActivityHint();
+    updateReworkFormSidebar();
+}
+
+function setFieldValue(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.value = value || '';
+}
+
+function setSelectValue(id, value) {
+    const el = document.getElementById(id);
+    if (!el || !value) return;
+    el.value = value;
+    if (el.value !== value) {
+        const option = Array.from(el.options).find((opt) => opt.value === value);
+        if (option) option.selected = true;
+    }
+}
+
+function openCreateInstructionModal() {
+    const modal = document.getElementById('create-instruction-modal');
+    if (!modal) return;
+    modal.hidden = false;
+    modal.setAttribute('aria-hidden', 'false');
+}
+
+function closeCreateInstructionModal() {
+    const modal = document.getElementById('create-instruction-modal');
+    if (!modal) return;
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+}
+
+function resetReworkUploadFields() {
+    const mainInput = document.getElementById('rework-main-input');
+    const analysisInput = document.getElementById('rework-analysis-input');
+    const vndName = document.getElementById('rework-vnd-name');
+    const mainStatus = document.getElementById('rework-main-status');
+    if (mainInput) mainInput.value = '';
+    if (analysisInput) analysisInput.value = '';
+    if (vndName) vndName.value = '';
+    if (mainStatus) {
+        mainStatus.textContent = '';
+        mainStatus.className = 'upload-status';
+    }
+    const stage1Panel = document.getElementById('rework-step-form');
+    if (stage1Panel) stage1Panel.style.display = 'none';
+    const progress = document.getElementById('rework-progress');
+    if (progress) {
+        progress.style.display = 'none';
+        progress.textContent = '';
+    }
+}
+
+async function refreshReworkFormPrefill() {
+    if (!mainFilename) return null;
+
+    const vndName = document.getElementById('rework-vnd-name')?.value || '';
+    const response = await fetch(`${API_BASE}/api/create/rework/stage1`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            main_filename: mainFilename,
+            vnd_name: vndName,
+            analysis_text: analysisText || '',
+            analysis_filename: analysisFilename || '',
+        }),
+    });
+    if (!response.ok) {
+        throw new Error(await readApiError(response, 'Не удалось определить параметры документа'));
+    }
+    return response.json();
 }
 
 function resetReworkAnalysisState(message) {
@@ -255,7 +498,8 @@ function fillLegalMultiSelect(selectId, options, selectedAreas) {
 
 function backToCreateMenu() {
     stopProgress();
-    reworkStage1Ready = false;
+    reworkFormReady = false;
+    reworkFormState = null;
     mainFilename = null;
     analysisFilename = null;
     analysisText = null;
@@ -266,28 +510,41 @@ function backToCreateMenu() {
     closeCreateQaModal();
     leaveCreateResultView();
     document.body.classList.remove('create-new-active');
-    const btn = document.getElementById('btn-rework-start');
-    if (btn) {
-        btn.textContent = 'Начать переработку';
-        btn.disabled = true;
-    }
+    document.body.classList.remove('create-rework-active');
+    resetReworkUploadFields();
     resetReworkAnalysisState();
-    document.getElementById('create-menu').style.display = 'flex';
+    const landing = document.getElementById('create-landing');
+    const sharedPrep = document.getElementById('create-shared-prep');
+    if (landing) landing.style.display = 'flex';
+    if (sharedPrep) sharedPrep.style.display = 'none';
     document.getElementById('rework-panel').style.display = 'none';
     document.getElementById('new-panel').style.display = 'none';
+    const formStep = document.getElementById('rework-step-form');
+    if (formStep) formStep.style.display = 'none';
+    const resultPanel = document.getElementById('rework-result-panel');
+    if (resultPanel) resultPanel.style.display = 'none';
     document.body.classList.remove('analysis-active');
+    updateReworkPrefillButton();
 }
 
 function enterCreateResultView(mode) {
     document.body.classList.add('analysis-active');
     document.body.classList.add('create-result-view');
     document.body.classList.remove('create-new-active');
+    document.body.classList.remove('create-rework-active');
+    document.getElementById('create-shared-prep').style.display = 'none';
+    document.getElementById('new-panel').style.display = 'none';
+    const reworkForm = document.getElementById('rework-step-form');
+    if (reworkForm) reworkForm.style.display = 'none';
+
     if (mode === 'rework') {
         document.getElementById('rework-panel')?.classList.add('create-result-visible');
+        document.getElementById('rework-panel').style.display = 'block';
         const resultPanel = document.getElementById('rework-result-panel');
         if (resultPanel) resultPanel.style.setProperty('display', 'flex', 'important');
     } else {
         document.getElementById('new-panel')?.classList.add('create-result-visible');
+        document.getElementById('new-panel').style.display = 'block';
         showNewStep('document');
     }
     requestAnimationFrame(() => {
@@ -325,16 +582,55 @@ function confirmExitWithoutSave() {
 
 function showReworkMode() {
     document.body.classList.remove('create-new-active');
-    document.getElementById('create-menu').style.display = 'none';
-    document.getElementById('rework-panel').style.display = 'block';
+    document.body.classList.remove('create-rework-active');
+    const landing = document.getElementById('create-landing');
+    if (landing) landing.style.display = 'none';
     document.getElementById('new-panel').style.display = 'none';
-    updateReworkStartButton();
+    document.getElementById('rework-panel').style.display = 'block';
+    const resultPanel = document.getElementById('rework-result-panel');
+    if (resultPanel) resultPanel.style.display = 'none';
+    const formStep = document.getElementById('rework-step-form');
+    if (formStep) formStep.style.display = 'none';
+    showReworkStep('prep');
+}
+
+function showReworkStep(step) {
+    const prep = document.getElementById('create-shared-prep');
+    const form = document.getElementById('rework-step-form');
+    const result = document.getElementById('rework-result-panel');
+    const panel = document.getElementById('rework-panel');
+
+    if (step === 'prep') {
+        leaveCreateResultView();
+        if (prep) prep.style.display = 'block';
+        if (form) form.style.display = 'none';
+        if (result) result.style.display = 'none';
+        if (panel) panel.style.display = 'block';
+        document.getElementById('new-panel').style.display = 'none';
+        document.body.classList.remove('create-rework-active');
+        updateReworkPrefillButton();
+        return;
+    }
+
+    if (step === 'form') {
+        leaveCreateResultView();
+        if (prep) prep.style.display = 'none';
+        if (form) form.style.setProperty('display', 'flex', 'important');
+        if (result) result.style.display = 'none';
+        if (panel) panel.style.display = 'block';
+        document.getElementById('new-panel').style.display = 'none';
+        document.body.classList.add('create-rework-active');
+        updateReworkFormSidebar();
+    }
 }
 
 function showNewMode() {
     leaveCreateResultView();
     document.body.classList.remove('analysis-active');
-    document.getElementById('create-menu').style.display = 'none';
+    const landing = document.getElementById('create-landing');
+    const sharedPrep = document.getElementById('create-shared-prep');
+    if (landing) landing.style.display = 'none';
+    if (sharedPrep) sharedPrep.style.display = 'none';
     document.getElementById('new-panel').style.display = 'block';
     document.getElementById('rework-panel').style.display = 'none';
     newFlowState = { form: null, followup_answers: {}, analysis: '', laws: [], download_result: null };
@@ -948,11 +1244,11 @@ async function uploadCreateFile(kind) {
         const data = await response.json();
         if (kind === 'main') {
             mainFilename = data.filename;
-            reworkStage1Ready = false;
+            reworkFormReady = false;
             if (!document.getElementById('rework-vnd-name').value) {
                 document.getElementById('rework-vnd-name').value = file.name.replace(/\.[^/.]+$/, '');
             }
-            updateReworkStartButton();
+            updateReworkPrefillButton();
             await autoLoadReworkAnalysis(file.name);
         } else {
             analysisFilename = data.filename;
@@ -977,51 +1273,178 @@ async function uploadCreateFile(kind) {
     }
 }
 
-function collectReworkStage1Answers() {
-    const legalSelect = document.getElementById('rework-legal');
-    const legalAreas = legalSelect
-        ? Array.from(legalSelect.selectedOptions).map((o) => o.value)
-        : [];
+function collectReworkFormData() {
     return {
+        document_name: document.getElementById('rework-doc-name')?.value?.trim() || '',
+        document_topic: document.getElementById('rework-doc-topic')?.value?.trim() || '',
+        legal_area: document.getElementById('rework-legal-area')?.value || '',
+        legal_area_custom: document.getElementById('rework-legal-custom')?.value?.trim() || '',
         activity_sphere: document.getElementById('rework-activity')?.value || '',
         ownership_form: document.getElementById('rework-ownership')?.value || '',
-        legal_areas: legalAreas,
+        state_secret: document.getElementById('rework-state-secret')?.value || '',
+        employees_count: document.getElementById('rework-employees')?.value?.trim() || '',
+        branches: document.getElementById('rework-branches')?.value?.trim() || '',
+        target_audience: document.getElementById('rework-audience')?.value || '',
+        target_audience_custom: document.getElementById('rework-audience-custom')?.value?.trim() || '',
     };
 }
 
-function populateReworkStage1(data) {
-    reworkStage1Data = data;
-    const options = data.options || {};
-    populateSelectOptions('rework-activity', options.activity_spheres, data.activity_sphere);
-    populateSelectOptions('rework-ownership', options.ownership_forms, data.ownership_form);
-    fillLegalMultiSelect('rework-legal', options.legal_areas, data.legal_areas);
-
-    const panel = document.getElementById('rework-stage1-panel');
-    const note = document.getElementById('rework-stage1-note');
-    if (panel) panel.style.display = 'block';
-    if (note) {
-        note.textContent = data.needs_user_input?.length
-            ? 'Уточните параметры перед анализом и переработкой.'
-            : 'Параметры определены из документа. При необходимости измените.';
+function highlightReworkFormErrors(missing) {
+    document.querySelectorAll('#rework-step-form .stage1-field').forEach((el) => {
+        el.classList.remove('field-error');
+    });
+    (missing || []).forEach((field) => {
+        const el = document.querySelector(`#rework-step-form .stage1-field[data-field="${field}"]`);
+        if (el) el.classList.add('field-error');
+    });
+    const errorBox = document.getElementById('rework-form-error');
+    if (errorBox) {
+        if (missing?.length) {
+            errorBox.style.display = 'block';
+            errorBox.textContent = 'Заполните все обязательные поля (выделены красным).';
+        } else {
+            errorBox.style.display = 'none';
+            errorBox.textContent = '';
+        }
     }
 }
 
-function stage1FromDetectedData(data) {
+function updateReworkLegalAreaHint() {
+    const select = document.getElementById('rework-legal-area');
+    const hint = document.getElementById('rework-legal-area-hint');
+    if (!select || !hint) return;
+    const option = select.selectedOptions[0];
+    const examples = option?.dataset?.examples || '';
+    hint.textContent = examples ? `Примеры: ${examples.replace(/;/g, ' · ')}` : '';
+    updateReworkFormSidebar();
+}
+
+function updateReworkActivityHint() {
+    const select = document.getElementById('rework-activity');
+    const hint = document.getElementById('rework-activity-hint');
+    if (!select || !hint) return;
+    const option = select.selectedOptions[0];
+    hint.textContent = option?.dataset?.description || '';
+    updateReworkFormSidebar();
+}
+
+function updateReworkFormSidebar() {
+    const sidebar = document.getElementById('rework-form-sidebar-text');
+    if (!sidebar) return;
+
+    const legalHint = document.getElementById('rework-legal-area-hint')?.textContent || '';
+    const activityHint = document.getElementById('rework-activity-hint')?.textContent || '';
+    const parts = [];
+
+    if (legalHint) {
+        parts.push(`<strong>Область законодательства:</strong> ${escapeHtml(legalHint)}`);
+    }
+    if (activityHint) {
+        parts.push(`<strong>Сфера деятельности:</strong> ${escapeHtml(activityHint)}`);
+    }
+    if (!parts.length) {
+        sidebar.textContent =
+            'Выберите область законодательства и сферу деятельности — здесь появятся пояснения.';
+        return;
+    }
+    sidebar.innerHTML = parts.join('<br><br>');
+}
+
+function toggleReworkCustomField(kind) {
+    if (kind === 'legal') {
+        const isCustom = document.getElementById('rework-legal-area')?.value === 'custom';
+        const wrap = document.getElementById('rework-legal-custom-wrap');
+        if (wrap) wrap.style.display = isCustom ? 'block' : 'none';
+        updateReworkLegalAreaHint();
+    }
+    if (kind === 'audience') {
+        const isCustom = document.getElementById('rework-audience')?.value === 'custom';
+        const wrap = document.getElementById('rework-audience-custom-wrap');
+        if (wrap) wrap.style.display = isCustom ? 'block' : 'none';
+    }
+}
+
+function populateReworkForm(data) {
+    reworkFormState = data;
+    const form = data.form || {};
+    if (data.options) {
+        populateReworkFormOptions(data.options);
+    }
+
+    setFieldValue('rework-doc-name', form.document_name);
+    setFieldValue('rework-doc-topic', form.document_topic);
+    setSelectValue('rework-legal-area', form.legal_area);
+    setFieldValue('rework-legal-custom', form.legal_area_custom);
+    toggleReworkCustomField('legal');
+    setSelectValue('rework-activity', form.activity_sphere);
+    setSelectValue('rework-ownership', form.ownership_form);
+    setSelectValue('rework-state-secret', form.state_secret);
+    setFieldValue('rework-employees', form.employees_count);
+    setFieldValue('rework-branches', form.branches);
+    setSelectValue('rework-audience', form.target_audience);
+    setFieldValue('rework-audience-custom', form.target_audience_custom);
+    toggleReworkCustomField('audience');
+    highlightReworkFormErrors([]);
+    updateReworkFormSidebar();
+}
+
+function reworkFormToStage1(form) {
+    const legalMap = {
+        corporate: 'Другое',
+        personal_data: 'Персональные данные',
+        confidentiality_ib: 'Информационная безопасность',
+        labor: 'Трудовое законодательство',
+        contracts_procurement: 'Закупки и контрактная система',
+        finance_risks: 'Безопасность финансовых (банковских) операций',
+        compliance_ethics: 'Противодействие коррупции',
+        custom: 'Другое',
+    };
+    const activityMap = {
+        finance: 'Финансы',
+        it_telecom: 'Информационные технологии (IT)',
+        trade_services: 'Услуги',
+        manufacturing: 'Производство',
+        construction_realestate: 'Строительство',
+        social: 'Образовательные услуги',
+    };
+
+    let legalLabel = legalMap[form.legal_area] || 'Другое';
+    if (form.legal_area === 'custom' && form.legal_area_custom) {
+        legalLabel = form.legal_area_custom;
+    }
+
+    const ownership = form.ownership_form || '';
+    let ownershipOld = 'Частные компании';
+    if (/государствен/i.test(ownership)) {
+        ownershipOld = 'Государственные предприятия';
+    }
+
     return {
-        activity_sphere: data.activity_sphere || '',
-        ownership_form: data.ownership_form || '',
-        legal_areas: data.legal_areas || [],
+        activity_sphere: activityMap[form.activity_sphere] || 'Другое',
+        ownership_form: ownershipOld,
+        legal_areas: [legalLabel],
     };
 }
 
-function canAutoRunReworkStage1(data) {
-    const stage = stage1FromDetectedData(data);
-    return Boolean(
-        stage.activity_sphere
-        && stage.ownership_form
-        && stage.legal_areas.length
-        && !(data.needs_user_input || []).length
-    );
+async function goToReworkForm() {
+    if (!mainFilename) {
+        alert('Загрузите основной (перерабатываемый) документ');
+        return;
+    }
+
+    const btn = document.getElementById('btn-rework-prefill');
+    if (btn) btn.disabled = true;
+
+    try {
+        const data = await refreshReworkFormPrefill();
+        populateReworkForm(data);
+        reworkFormReady = true;
+        showReworkStep('form');
+    } catch (error) {
+        alert('❌ ' + formatCaughtError(error, 'Не удалось подготовить параметры'));
+    } finally {
+        updateReworkPrefillButton();
+    }
 }
 
 async function runReworkAnalyzeAndGenerate(mainFilename, vndName, stage1) {
@@ -1109,91 +1532,37 @@ function showReworkResult(data, resultPanel) {
     renderReworkDocument(lastReworkDocument);
     resultPanel.style.display = 'flex';
     enterCreateResultView('rework');
-
-    const savedNote = document.getElementById('rework-saved-note');
-    if (savedNote) {
-        const parts = [];
-        if (data.saved_file && data.saved_file.filepath) {
-            parts.push(`📁 Документ: ${data.saved_file.filename}`);
-        }
-        if (data.saved_changes_report && data.saved_changes_report.filepath) {
-            parts.push(`📋 Отчёт: ${data.saved_changes_report.filename}`);
-        }
-        if (parts.length) {
-            savedNote.style.display = 'block';
-            savedNote.textContent = `Сохранено в new-doc рабочей папки: ${parts.join(' · ')}`;
-        } else {
-            savedNote.style.display = 'none';
-            savedNote.textContent = '';
-        }
-    }
 }
 
-async function startRework() {
+async function runReworkFromForm() {
     if (!mainFilename) {
         alert('Загрузите основной (перерабатываемый) документ');
         return;
     }
 
+    const form = collectReworkFormData();
+    const missing = validateNewFormClient(form);
+    highlightReworkFormErrors(missing);
+    if (missing.length) return;
+
     const btn = document.getElementById('btn-rework-start');
-    const vndName = document.getElementById('rework-vnd-name')?.value || '';
+    const vndName = form.document_name || document.getElementById('rework-vnd-name')?.value || '';
     const progress = document.getElementById('rework-progress');
     const resultPanel = document.getElementById('rework-result-panel');
+    const hasAnalysis = Boolean(analysisFilename || analysisText);
+    const stage1 = reworkFormToStage1(form);
 
     if (btn) btn.disabled = true;
     if (resultPanel) resultPanel.style.display = 'none';
-
-    let stage1 = null;
+    showProgressBlock('rework-progress', hasAnalysis
+        ? 'Перерабатываю документ...'
+        : 'Выполняется правовой анализ документа...');
 
     try {
-        if (!analysisFilename && !analysisText && !reworkStage1Ready) {
-            showProgressBlock('rework-progress', 'Определяю параметры документа...');
-            const stage1Response = await fetch(`${API_BASE}/api/create/rework/stage1`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ main_filename: mainFilename, vnd_name: vndName }),
-            });
-            if (!stage1Response.ok) {
-                throw new Error(await readApiError(stage1Response, 'Не удалось выполнить предварительный анализ'));
-            }
-            const stage1Data = await stage1Response.json();
-            populateReworkStage1(stage1Data);
-            reworkStage1Ready = true;
+        const data = hasAnalysis
+            ? await runReworkWithUploadedAnalysis(mainFilename, vndName, stage1)
+            : await runReworkAnalyzeAndGenerate(mainFilename, vndName, stage1);
 
-            if (canAutoRunReworkStage1(stage1Data)) {
-                stage1 = stage1FromDetectedData(stage1Data);
-                const data = await runReworkAnalyzeAndGenerate(mainFilename, vndName, stage1);
-                completeProgress('rework-progress');
-                if (progress) progress.style.display = 'none';
-                showReworkResult(data, resultPanel);
-                return;
-            }
-
-            completeProgress('rework-progress');
-            if (progress) {
-                progress.style.display = 'block';
-                progress.className = 'stage1-note';
-                progress.textContent =
-                    'Проверьте параметры ниже. Будет выполнен правовой анализ (без сохранения отчёта) и сразу переработка.';
-            }
-            if (btn) btn.textContent = 'Продолжить переработку';
-            return;
-        }
-
-        if (!analysisFilename && !analysisText) {
-            stage1 = collectReworkStage1Answers();
-            if (!stage1.activity_sphere || !stage1.ownership_form || !stage1.legal_areas.length) {
-                alert('Заполните все поля этапа 1');
-                return;
-            }
-            const data = await runReworkAnalyzeAndGenerate(mainFilename, vndName, stage1);
-            completeProgress('rework-progress');
-            if (progress) progress.style.display = 'none';
-            showReworkResult(data, resultPanel);
-            return;
-        }
-
-        const data = await runReworkWithUploadedAnalysis(mainFilename, vndName, stage1);
         completeProgress('rework-progress');
         if (progress) progress.style.display = 'none';
         showReworkResult(data, resultPanel);
@@ -1205,7 +1574,7 @@ async function startRework() {
             progress.textContent = '❌ ' + formatCaughtError(error, 'Ошибка переработки');
         }
     } finally {
-        if (btn) btn.disabled = !mainFilename;
+        if (btn) btn.disabled = false;
     }
 }
 
@@ -1215,34 +1584,6 @@ async function runNewStep2() {
 
 async function runNewGenerate() {
     await runNewContinue();
-}
-
-async function saveCreateDocumentToWorkFolder(mode, format = 'docx') {
-    const documentText = mode === 'rework' ? lastReworkDocument : lastNewDocument;
-    if (!documentText) {
-        alert('Нет документа для сохранения');
-        return;
-    }
-
-    const title = mode === 'rework'
-        ? (document.getElementById('rework-vnd-name')?.value || 'Переработка')
-        : (newFlowState.form?.document_name || 'Новый ВНД');
-
-    try {
-        const result = await saveDocumentToWorkFolder(
-            `${API_BASE}/api/create/save`,
-            {
-                document: documentText,
-                title,
-                format,
-                mode,
-            },
-            'Не удалось сохранить документ',
-        );
-        alert(`✅ Документ сохранён в рабочую папку\n\n📁 ${result.filepath || result.filename}`);
-    } catch (error) {
-        alert('❌ ' + formatCaughtError(error, 'Ошибка сохранения'));
-    }
 }
 
 async function downloadCreateDocument(mode, format = 'docx') {
@@ -1380,33 +1721,6 @@ async function sendCreateQaMessage() {
     }
 }
 
-async function saveCreateQaDialogToWorkFolder() {
-    if (!createQaMode) return;
-
-    const state = createQaState[createQaMode];
-    const hasUserMessages = state.messages.some((msg) => msg.role === 'user');
-    if (!hasUserMessages) {
-        alert('В диалоге пока нет вопросов для сохранения');
-        return;
-    }
-
-    try {
-        const title = getCreateQaTitle(createQaMode);
-        const result = await saveDocumentToWorkFolder(
-            `${API_BASE}/api/create/qa/save`,
-            {
-                mode: createQaMode,
-                title,
-                messages: state.messages,
-            },
-            'Не удалось сохранить диалог',
-        );
-        alert(`✅ Диалог сохранён в рабочую папку\n\n📁 ${result.filepath || result.filename}`);
-    } catch (error) {
-        alert('❌ ' + formatCaughtError(error, 'Ошибка сохранения диалога'));
-    }
-}
-
 async function downloadCreateQaDialog() {
     if (!createQaMode) return;
 
@@ -1435,11 +1749,18 @@ async function downloadCreateQaDialog() {
     }
 }
 
+window.goToReworkForm = goToReworkForm;
+window.showReworkStep = showReworkStep;
+window.runReworkFromForm = runReworkFromForm;
+window.toggleReworkCustomField = toggleReworkCustomField;
+window.updateReworkActivityHint = updateReworkActivityHint;
+window.openCreateInstructionModal = openCreateInstructionModal;
+window.closeCreateInstructionModal = closeCreateInstructionModal;
 window.showReworkMode = showReworkMode;
 window.showNewMode = showNewMode;
 window.backToCreateMenu = backToCreateMenu;
 window.uploadCreateFile = uploadCreateFile;
-window.startRework = startRework;
+window.startRework = runReworkFromForm;
 window.runNewGoToFollowup = runNewGoToFollowup;
 window.runNewAnalyze = runNewAnalyze;
 window.runNewContinue = runNewContinue;
@@ -1447,8 +1768,6 @@ window.toggleNewCustomField = toggleNewCustomField;
 window.updateActivityHint = updateActivityHint;
 window.runNewStep2 = runNewStep2;
 window.runNewGenerate = runNewGenerate;
-window.saveCreateDocumentToWorkFolder = saveCreateDocumentToWorkFolder;
-window.saveCreateQaDialogToWorkFolder = saveCreateQaDialogToWorkFolder;
 window.downloadCreateDocument = downloadCreateDocument;
 window.showNewStep = showNewStep;
 window.showExitWithoutSaveModal = showExitWithoutSaveModal;

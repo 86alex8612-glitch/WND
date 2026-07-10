@@ -40,6 +40,16 @@ from error_messages import humanize_error, http_detail
 # Определяем путь к корню проекта (родительская директория от backend)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
+USER_INSTRUCTION_FILE = os.path.join(BASE_DIR, "ИНСТРУКЦИЯ_ПОЛЬЗОВАТЕЛЯ.md")
+HTML_NO_CACHE_HEADERS = {
+    "Cache-Control": "no-cache, no-store, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
+def html_file_response(path: str) -> FileResponse:
+    return FileResponse(path, headers=HTML_NO_CACHE_HEADERS)
 
 app = FastAPI(title="НейроКонсультант по ВНД")
 
@@ -183,7 +193,7 @@ async def root():
     """Главная страница - отдаем frontend"""
     index_path = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_path):
-        return FileResponse(index_path)
+        return html_file_response(index_path)
     return {"message": "НейроКонсультант по ВНД API"}
 
 @app.get("/favicon.ico")
@@ -196,7 +206,7 @@ async def analiz_page():
     """Страница анализа ВНД"""
     analiz_path = os.path.join(FRONTEND_DIR, "analiz.html")
     if os.path.exists(analiz_path):
-        return FileResponse(analiz_path)
+        return html_file_response(analiz_path)
     raise HTTPException(status_code=404, detail="Страница не найдена")
 
 @app.get("/search")
@@ -204,7 +214,7 @@ async def search_page():
     """Страница поиска по ВНД"""
     search_path = os.path.join(FRONTEND_DIR, "search.html")
     if os.path.exists(search_path):
-        return FileResponse(search_path)
+        return html_file_response(search_path)
     raise HTTPException(status_code=404, detail="Страница не найдена")
 
 @app.get("/create")
@@ -212,8 +222,53 @@ async def create_page():
     """Страница помощника в создании ВНД"""
     create_path = os.path.join(FRONTEND_DIR, "create.html")
     if os.path.exists(create_path):
-        return FileResponse(create_path)
+        return html_file_response(create_path)
     raise HTTPException(status_code=404, detail="Страница не найдена")
+
+
+@app.get("/api/user-instruction")
+async def user_instruction():
+    """Текст инструкции пользователя из файла проекта"""
+    if not os.path.isfile(USER_INSTRUCTION_FILE):
+        raise HTTPException(status_code=404, detail="Файл инструкции пользователя не найден")
+    try:
+        with open(USER_INSTRUCTION_FILE, "r", encoding="utf-8") as file:
+            content = file.read()
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=http_detail(exc, "instruction_load"))
+    return {
+        "title": "Инструкция пользователя",
+        "content": content,
+        "mtime": os.path.getmtime(USER_INSTRUCTION_FILE),
+    }
+
+
+@app.get("/api/ui-version")
+async def ui_version():
+    """Диагностика: какая версия frontend отдаётся сервером"""
+    create_path = os.path.join(FRONTEND_DIR, "create.html")
+    info = {
+        "frontend_dir": FRONTEND_DIR,
+        "create_ui_version": "20260805",
+        "create_html_exists": os.path.exists(create_path),
+        "create_html_mtime": None,
+        "markers": {
+            "create_landing": False,
+            "instruction_button": False,
+            "ui_version_badge": False,
+        },
+    }
+    if os.path.exists(create_path):
+        info["create_html_mtime"] = os.path.getmtime(create_path)
+        try:
+            with open(create_path, "r", encoding="utf-8") as f:
+                text = f.read()
+            info["markers"]["create_landing"] = "create-landing" in text
+            info["markers"]["instruction_button"] = "btn-header-instruction" in text
+            info["markers"]["ui_version_badge"] = "UI 20260805" in text
+        except OSError:
+            pass
+    return info
 
 # API endpoints
 
@@ -638,6 +693,8 @@ class AnalyzeVndRequest(BaseModel):
 class CreateStage1Request(BaseModel):
     main_filename: Optional[str] = ""
     vnd_name: Optional[str] = ""
+    analysis_text: Optional[str] = ""
+    analysis_filename: Optional[str] = ""
 
 
 class CreateReworkRequest(BaseModel):
@@ -943,13 +1000,18 @@ async def create_upload(
 async def create_rework_stage1(request: CreateStage1Request):
     """Определить параметры этапа 1 для переработки (если нет отчёта анализа)."""
     try:
-        from create_vnd import detect_rework_stage1
+        from create_vnd import detect_rework_form_prefill
 
         filename = (request.main_filename or "").strip()
         if not filename:
             raise HTTPException(status_code=400, detail="Не указан основной документ")
 
-        return detect_rework_stage1(filename, request.vnd_name or "")
+        return detect_rework_form_prefill(
+            filename,
+            request.vnd_name or "",
+            request.analysis_text or "",
+            request.analysis_filename or "",
+        )
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=http_detail(e, "upload"))
     except Exception as e:

@@ -3,45 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Помощник в создании ВНД - НейроКонсультант</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260801">
+    <link rel="stylesheet" href="/static/styles.css?v=20260710b">
 </head>
 <body>
     <header class="header">
         <div class="header-content">
             <h1>НейроКонсультант по организационно-распорядительным документам</h1>
-            <button class="btn-back" onclick="window.location.href='/'">← Назад</button>
+            <div class="header-actions">
+                <span class="create-ui-version" title="Версия интерфейса помощника">UI 20260805</span>
+                <button type="button" class="btn-header-instruction" onclick="openCreateInstructionModal()" title="Инструкция по карточке «Помощник в создании ВНД»">📖 Инструкция по карточке</button>
+                <button class="btn-back" onclick="window.location.href='/'">← Назад</button>
+            </div>
         </div>
     </header>
 
     <main class="analiz-content">
         <div class="analiz-container">
-            <h2>Помощник в создании ВНД</h2>
-            <p class="create-explanation">
-                <strong>ВНД</strong> — это внутренний (локальный) нормативный документ организации.
-            </p>
-
             <div id="create-result-notice" class="create-result-notice" aria-live="polite">
                 <p>Вы получили шаблон внутреннего нормативного документа. Это хорошая основа, которую удобно дорабатывать под вашу компанию.</p>
                 <p><strong>Обратите внимание:</strong> для юридической значимости документ нужно адаптировать, изменить фейковое название предприятия, добавить реквизиты и согласовать с профильными экспертами.</p>
             </div>
 
-            <div id="create-menu" class="create-menu">
-                <button class="btn-primary create-mode-btn" onclick="showReworkMode()">Переработать документ</button>
-                <button class="btn-secondary create-mode-btn" onclick="showNewMode()">Создать новый</button>
+            <div id="create-landing" class="create-landing">
+                <h2>Помощник в создании ВНД</h2>
+                <div class="create-landing-instruction">
+                    <p><strong>ВНД</strong> — внутренний нормативный документ организации. Помощник работает в двух режимах:</p>
+                    <ul>
+                        <li><strong>Переработка</strong> — загрузите документ и отчёт анализа (подберётся автоматически). Параметры заполнятся из файлов, затем система сформирует улучшенный текст и отчёт об изменениях.</li>
+                        <li><strong>Новый документ</strong> — пошаговая анкета, правовой анализ и генерация проекта ВНД.</li>
+                    </ul>
+                    <p>Нормативная база (ГОСТ и ФЗ) загружается в карточке «Статистика» на главном экране. Готовый результат можно скачать на ваш компьютер.</p>
+                </div>
+                <div id="create-menu" class="create-menu">
+                    <button class="btn-primary create-mode-btn" onclick="showReworkMode()">Переработать документ</button>
+                    <button class="btn-secondary create-mode-btn" onclick="showNewMode()">Создать новый</button>
+                </div>
             </div>
 
-            <!-- Режим: переработка -->
-            <div id="rework-panel" class="create-panel" style="display: none;">
-                <h3>Переработка существующего документа</h3>
-                <p class="stage-subtitle">Загрузите основной документ. Отчёт анализа подбирается автоматически по имени файла.</p>
-                <details class="create-prompt-info">
-                    <summary>Роль и требования к переработке</summary>
-                    <div class="create-prompt-body">
-                        <p>Старший юрисконсульт составляет план по каждому недостатку из отчёта анализа и формирует <strong>полный текст ВНД</strong>: главы со статьями (минимум 3–5 предложений в каждой), адаптация требований основного ФЗ.</p>
-                        <p>Переработанный документ должен устранить все замечания анализа — не только заголовки, а развёрнутые нормы.</p>
-                    </div>
-                </details>
+            <!-- Общий блок подготовки документа (режим переработки) -->
+            <div id="create-shared-prep" class="create-shared-prep" style="display: none;">
+                <h3>Подготовка документа</h3>
+                <p class="stage-subtitle">Загрузите основной документ. Отчёт анализа подбирается автоматически по имени файла; при необходимости загрузите другой.</p>
 
                 <div class="create-upload-block">
                     <label>Основной (перерабатываемый) документ *</label>
@@ -60,40 +66,103 @@
 
                 <input type="text" id="rework-vnd-name" placeholder="Название документа" class="create-text-input" />
 
-                <div id="rework-stage1-panel" class="analysis-stage-panel" style="display: none;">
-                    <h4>Уточнение параметров (если отчёт анализа не загружен)</h4>
-                    <p class="stage-subtitle">Будет выполнен правовой анализ как в разделе «Анализ ВНД» (отчёт не сохраняется), затем сразу переработка документа.</p>
-                    <div class="stage1-field">
-                        <label for="rework-activity">Сфера деятельности</label>
-                        <select id="rework-activity"></select>
-                    </div>
-                    <div class="stage1-field">
-                        <label for="rework-ownership">Форма собственности</label>
-                        <select id="rework-ownership"></select>
-                    </div>
-                    <div class="stage1-field">
-                        <label for="rework-legal">Области законодательства</label>
-                        <select id="rework-legal" multiple size="5"></select>
-                    </div>
-                    <div id="rework-stage1-note" class="stage1-note"></div>
-                </div>
-
-                <div id="rework-progress" class="stage1-note stage1-note-progress" style="display: none;"></div>
-
                 <div class="create-actions">
-                    <button class="btn-success" id="btn-rework-start" onclick="startRework()" disabled>Начать переработку</button>
+                    <button class="btn-success" id="btn-rework-prefill" onclick="goToReworkForm()" disabled>Начать предварительный анализ</button>
                     <button class="btn-secondary" onclick="backToCreateMenu()">Назад</button>
+                </div>
+            </div>
+
+            <!-- Режим: переработка -->
+            <div id="rework-panel" class="create-panel" style="display: none;">
+                <div id="rework-step-form" class="create-step new-form-step" style="display: none;">
+                    <div class="new-form-header">
+                        <h3>Параметры перерабатываемого документа</h3>
+                        <p class="stage-subtitle">Поля заполнены автоматически из документа и отчёта анализа. Проверьте и при необходимости исправьте.</p>
+                    </div>
+
+                    <div class="new-form-layout">
+                        <div class="new-form-column">
+                            <div class="stage1-field" data-field="document_name">
+                                <label for="rework-doc-name">1. Название документа</label>
+                                <input type="text" id="rework-doc-name" class="create-text-input" placeholder="Например: Политика обработки персональных данных" />
+                            </div>
+
+                            <div class="stage1-field" data-field="document_topic">
+                                <label for="rework-doc-topic">2. Тема документа (краткое описание)</label>
+                                <input type="text" id="rework-doc-topic" class="create-text-input" placeholder="Кратко опишите назначение документа" />
+                            </div>
+
+                            <div class="stage1-field" data-field="legal_area">
+                                <label for="rework-legal-area">3. Область законодательства</label>
+                                <select id="rework-legal-area" onchange="toggleReworkCustomField('legal')"></select>
+                                <p id="rework-legal-area-hint" class="stage1-hint"></p>
+                            </div>
+                            <div class="stage1-field" id="rework-legal-custom-wrap" data-field="legal_area_custom" style="display: none;">
+                                <label for="rework-legal-custom">Укажите область законодательства</label>
+                                <input type="text" id="rework-legal-custom" class="create-text-input" />
+                            </div>
+
+                            <div class="stage1-field" data-field="activity_sphere">
+                                <label for="rework-activity">4. Сфера деятельности предприятия</label>
+                                <select id="rework-activity" onchange="updateReworkActivityHint()"></select>
+                                <p id="rework-activity-hint" class="stage1-hint"></p>
+                            </div>
+
+                            <div class="stage1-field" data-field="ownership_form">
+                                <label for="rework-ownership">5. Форма собственности</label>
+                                <select id="rework-ownership"></select>
+                            </div>
+                        </div>
+
+                        <div class="new-form-column new-form-column-right">
+                            <div class="stage1-field" data-field="state_secret">
+                                <label for="rework-state-secret">6. Отношение к гостайне</label>
+                                <select id="rework-state-secret"></select>
+                            </div>
+
+                            <div class="stage1-field" data-field="employees_count">
+                                <label for="rework-employees">7. Количество сотрудников (примерно)</label>
+                                <input type="text" id="rework-employees" class="create-text-input" placeholder="Например: 150" />
+                            </div>
+
+                            <div class="stage1-field" data-field="branches">
+                                <label for="rework-branches">8. Наличие филиалов/представительств</label>
+                                <input type="text" id="rework-branches" class="create-text-input" placeholder="Например: 3 филиала в регионах" />
+                            </div>
+
+                            <div class="stage1-field" data-field="target_audience">
+                                <label for="rework-audience">9. Целевая аудитория документа</label>
+                                <select id="rework-audience" onchange="toggleReworkCustomField('audience')"></select>
+                            </div>
+                            <div class="stage1-field" id="rework-audience-custom-wrap" data-field="target_audience_custom" style="display: none;">
+                                <label for="rework-audience-custom">Укажите целевую аудиторию</label>
+                                <input type="text" id="rework-audience-custom" class="create-text-input" />
+                            </div>
+
+                            <aside class="new-form-sidebar" aria-label="Подсказки">
+                                <h4>Подсказки</h4>
+                                <p id="rework-form-sidebar-text">Выберите область законодательства и сферу деятельности — здесь появятся пояснения.</p>
+                            </aside>
+                        </div>
+                    </div>
+
+                    <div class="new-form-footer">
+                        <div id="rework-form-error" class="stage1-note warning" style="display: none;"></div>
+                        <div id="rework-progress" class="stage1-note stage1-note-progress" style="display: none;"></div>
+                        <div class="create-actions">
+                            <button class="btn-success" id="btn-rework-start" onclick="runReworkFromForm()">Начать переработку</button>
+                            <button class="btn-secondary" onclick="showReworkStep('prep')">Назад</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="rework-result-panel" class="create-result-panel" style="display: none;">
                     <h4>Результат переработки</h4>
-                    <p id="rework-saved-note" class="stage1-note" style="display: none;"></p>
                     <h4 class="create-result-subheading">Отчёт о переработке</h4>
                     <div id="rework-changes-report" class="analysis-result create-changes-report"></div>
                     <h4 class="create-result-subheading">Текст документа</h4>
                     <div id="rework-result" class="analysis-result create-result-text"></div>
                     <div class="stage-footer-buttons create-result-actions">
-                        <button class="btn-success" onclick="saveCreateDocumentToWorkFolder('rework', 'docx')">Сохранить</button>
                         <button class="btn-primary" onclick="downloadCreateDocument('rework', 'docx')">Скачать</button>
                         <button class="btn-secondary" onclick="openCreateQaModal('rework')">Задать вопросы</button>
                         <button class="btn-danger" onclick="showExitWithoutSaveModal()">Завершить</button>
@@ -214,7 +283,6 @@
                         <div id="new-result" class="analysis-result create-result-text"></div>
                     </div>
                     <div class="stage-footer-buttons create-result-actions">
-                        <button class="btn-success" onclick="saveCreateDocumentToWorkFolder('new', 'docx')">Сохранить</button>
                         <button class="btn-primary" onclick="downloadCreateDocument('new', 'docx')">Скачать</button>
                         <button class="btn-secondary" onclick="openCreateQaModal('new')">Задать вопросы</button>
                         <button class="btn-danger" onclick="showExitWithoutSaveModal()">Завершить</button>
@@ -230,11 +298,22 @@
         </div>
     </footer>
 
+    <div id="create-instruction-modal" class="create-modal" hidden aria-hidden="true">
+        <div class="create-modal-backdrop" onclick="closeCreateInstructionModal()"></div>
+        <div class="create-modal-dialog create-instruction-dialog" role="dialog" aria-labelledby="create-instruction-title">
+            <h3 id="create-instruction-title">Инструкция: Помощник в создании ВНД</h3>
+            <div id="create-instruction-body" class="create-instruction-body"></div>
+            <div class="create-modal-actions">
+                <button class="btn-primary" onclick="closeCreateInstructionModal()">Понятно</button>
+            </div>
+        </div>
+    </div>
+
     <div id="exit-without-save-modal" class="create-modal" hidden aria-hidden="true">
         <div class="create-modal-backdrop" onclick="closeExitWithoutSaveModal()"></div>
         <div class="create-modal-dialog" role="dialog" aria-labelledby="exit-modal-title">
-            <h3 id="exit-modal-title">Выход без сохранения</h3>
-            <p class="create-modal-text">Документ не будет сохранён. Перейти на главный экран?</p>
+            <h3 id="exit-modal-title">Завершить работу</h3>
+            <p class="create-modal-text">Если вы не скачали документ, он не сохранится на вашем компьютере. Перейти на главный экран?</p>
             <div class="create-modal-actions">
                 <button class="btn-danger" onclick="confirmExitWithoutSave()">Выход</button>
                 <button class="btn-secondary" onclick="closeExitWithoutSaveModal()">Отмена</button>
@@ -254,15 +333,14 @@
             </div>
             <div class="create-modal-actions create-qa-footer">
                 <button class="btn-secondary" onclick="closeCreateQaModal()">Закрыть диалог</button>
-                <button class="btn-success" onclick="saveCreateQaDialogToWorkFolder()">Сохранить</button>
                 <button class="btn-primary" onclick="downloadCreateQaDialog()">Скачать</button>
             </div>
         </div>
     </div>
 
     <script src="/static/errors.js"></script>
-    <script src="/static/config-ui.js?v=20260801"></script>
+    <script src="/static/config-ui.js?v=20260805"></script>
     <script src="/static/downloads.js"></script>
-    <script src="/static/create.js?v=20260801"></script>
+    <script src="/static/create.js?v=20260710b"></script>
 </body>
 </html>

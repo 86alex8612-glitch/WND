@@ -4,14 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>НейроКонсультант по ВНД</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260709g">
+    <link rel="stylesheet" href="/static/styles.css?v=20260710">
 </head>
 <body>
     <!-- Шапка -->
     <header class="header">
         <div class="header-content">
             <h1>НейроКонсультант по организационно-распорядительным документам</h1>
-            <button type="button" class="btn-settings" id="btn-app-settings" title="Настройки" aria-label="Настройки">⚙</button>
+            <div class="header-actions">
+                <button type="button" class="btn-header-instruction" id="btn-user-instruction" title="Инструкция пользователя" aria-label="Инструкция пользователя">📖 Инструкция</button>
+                <button type="button" class="btn-settings" id="btn-app-settings" title="Настройки" aria-label="Настройки">⚙</button>
+            </div>
         </div>
     </header>
 
@@ -50,6 +53,22 @@
             <p>Разработчик: Алексей Ларионов</p>
         </div>
     </footer>
+
+    <div id="user-instruction-modal" class="user-instruction-modal" hidden aria-hidden="true">
+        <div class="user-instruction-backdrop" data-close-user-instruction></div>
+        <div class="user-instruction-dialog" role="dialog" aria-labelledby="user-instruction-title">
+            <div class="user-instruction-header">
+                <h3 id="user-instruction-title">Инструкция пользователя</h3>
+                <button type="button" class="user-instruction-close" data-close-user-instruction aria-label="Закрыть">&times;</button>
+            </div>
+            <div id="user-instruction-body" class="user-instruction-body">
+                <p class="user-instruction-loading">Загрузка инструкции…</p>
+            </div>
+            <div class="user-instruction-actions">
+                <button type="button" class="btn-primary" data-close-user-instruction>Закрыть</button>
+            </div>
+        </div>
+    </div>
 
     <div id="app-settings-modal" class="app-settings-modal" hidden aria-hidden="true">
         <div class="app-settings-backdrop" data-close-settings></div>
@@ -95,7 +114,8 @@
     <input type="file" id="stats-upload-folder-input" webkitdirectory directory multiple hidden />
 
     <script src="/static/errors.js"></script>
+    <script src="/static/user-instruction.js?v=20260710"></script>
     <script src="/static/config-ui.js?v=20260709g"></script>
-    <script src="/static/app.js?v=20260709g"></script>
+    <script src="/static/app.js?v=20260803"></script>
 </body>
 </html>
