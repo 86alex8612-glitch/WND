@@ -1070,11 +1070,14 @@ async def create_rework_generate(request: CreateReworkGenerateRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         import traceback
+        import logging
+        logging.getLogger("main").error(
+            "create_rework_generate failed: %s: %s",
+            type(e).__name__,
+            e,
+        )
         print(traceback.format_exc())
         raise HTTPException(status_code=500, detail=http_detail(e, "create"))
-
-
-@app.post("/api/create/rework/run")
 async def create_rework_run(request: CreateReworkRequest):
     """Переработка документа: анализ (при необходимости) + генерация."""
     try:

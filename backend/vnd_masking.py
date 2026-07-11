@@ -140,6 +140,29 @@ _FIO_PATTERNS = [
     r"\b[А-ЯЁ][а-яё\-]{1,40}\s+[А-ЯЁ][а-яё\-]{1,40}\s+[А-ЯЁ][а-яё\-]{1,40}\b",
 ]
 
+# Ссылки на НПА не маскируются (ФЗ, ГОСТ, положения/указания ЦБ РФ и т.п.)
+_LEGAL_REFERENCE_PATTERNS: List[str] = [
+    r"(?:Положение|Указание|Инструкция)\s+Банка\s+России"
+    r"(?:\s*\([^)]*\))?\s+от\s+\d{1,2}\.\d{1,2}\.\d{4}\s+№\s*[\w\-/]+(?:\s*[«\"][^»\"]+[»\"])?",
+    r"ГОСТ(?:\s*Р)?\s*[\d]+(?:\.[\d]+)*(?:\s*—\s*[\d.]+)?(?:\s*\([^)]*\))?"
+    r"(?:\s*[«\"][^»\"]+[»\"])?",
+    r"Федеральн\w+\s+закон\w*(?:\s+от\s+\d{1,2}\.\d{1,2}\.\d{4})?"
+    r"(?:\s+№\s*[\d\-–—]+(?:\s*[-–—]?\s*ФЗ)?)?(?:\s*[«\"][^»\"]+[»\"])?",
+    r"(?:\d+[\d\-–—]*\s*[-–—]?\s*)?ФЗ\s*(?:от\s+\d{1,2}\.\d{1,2}\.\d{4}\s+)?(?:№\s*)?[\d\-–—]+"
+    r"(?:\s*[-–—]?\s*ФЗ)?(?:\s*[«\"][^»\"]+[»\"])?",
+    r"Постановлен\w+\s+Правительства\s+(?:РФ\s+)?от\s+\d{1,2}\.\d{1,2}\.\d{4}"
+    r"\s+№\s*[\d\-–—]+(?:\s*[«\"][^»\"]+[»\"])?",
+    r"Трудовой\s+кодекс\s+РФ",
+    r"Кодекс\s+РФ\s+об\s+административных\s+правонарушениях",
+    r"\bКоАП\s+РФ\b",
+    r"(?:\d+\)\s*)?(?:Положение|Указание|Инструкция)\s+Банка\s+России[^\n«»]*[«\"][^»\"]+[»\"]",
+    r"(?:\d+\)\s*)?ГОСТ(?:\s*Р)?\s*[\d.]+(?:\s*—\s*[\d.]+)?[^\n«»]*[«\"][^»\"]+[»\"]",
+    r"(?:\d+\)\s*)?Федеральн\w+\s+закон\w*[^\n«»]*[«\"][^»\"]+[»\"]",
+]
+
+_NPA_PLACEHOLDER_PREFIX = "\uE000NPA:"
+_NPA_PLACEHOLDER_SUFFIX = "\uE001"
+
 
 def _mask_chars(value: str) -> str:
     return "*" * len(value)
@@ -188,17 +211,112 @@ def _apply_patterns(text: str, patterns: Iterable[Tuple[str, int]]) -> str:
     return result
 
 
+def _merge_spans(spans: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+    if not spans:
+        return []
+    ordered = sorted(spans, key=lambda item: (item[0], -(item[1] - item[0])))
+    merged: List[Tuple[int, int]] = []
+    for start, end in ordered:
+        if not merged or start >= merged[-1][1]:
+            merged.append((start, end))
+            continue
+        prev_start, prev_end = merged[-1]
+        merged[-1] = (prev_start, max(prev_end, end))
+    return merged
+
+
+def _find_legal_reference_spans(text: str) -> List[Tuple[int, int]]:
+    spans: List[Tuple[int, int]] = []
+    for pattern in _LEGAL_REFERENCE_PATTERNS:
+        for match in re.finditer(pattern, text, flags=_RE_FLAGS):
+            spans.append((match.start(), match.end()))
+    return _merge_spans(spans)
+
+
+def protect_legal_references(text: str) -> Tuple[str, dict]:
+    """Временно заменить ссылки на НПА плейсхолдерами перед маскированием."""
+    if not text:
+        return text, {}
+
+    spans = _find_legal_reference_spans(text)
+    if not spans:
+        return text, {}
+
+    placeholders: dict = {}
+    parts: List[str] = []
+    last = 0
+    for index, (start, end) in enumerate(spans):
+        parts.append(text[last:start])
+        key = f"{_NPA_PLACEHOLDER_PREFIX}{index}{_NPA_PLACEHOLDER_SUFFIX}"
+        placeholders[key] = text[start:end]
+        parts.append(key)
+        last = end
+    parts.append(text[last:])
+    return "".join(parts), placeholders
+
+
+def restore_legal_references(text: str, placeholders: dict) -> str:
+    """Вернуть защищённые ссылки на НПА после маскирования."""
+    if not text or not placeholders:
+        return text
+    result = text
+    for key in sorted(placeholders.keys(), key=len, reverse=True):
+        result = result.replace(key, placeholders[key])
+    return result
+
+
+def is_legal_reference_fragment(fragment: str) -> bool:
+    """Проверить, относится ли фрагмент к ссылке на ФЗ, ГОСТ или акт ЦБ РФ."""
+    value = (fragment or "").strip()
+    if len(value) < 3:
+        return False
+
+    lowered = value.lower()
+    legal_markers = (
+        "гост",
+        "федеральн",
+        " закон",
+        " фз",
+        "-фз",
+        "положение банка",
+        "указание банка",
+        "инструкция банка",
+        "банка россии",
+        "постановлен",
+        "правительства рф",
+        "трудовой кодекс",
+        "коап",
+        "кодекс рф",
+    )
+    if not any(marker in lowered for marker in legal_markers):
+        return False
+
+    if "«" in value or "»" in value or '"' in value:
+        return True
+    if re.search(r"\d+\s*[-–—]?\s*фз", lowered):
+        return True
+    if re.search(r"гост\s*р?\s*[\d]", lowered):
+        return True
+    if re.search(r"№\s*[\d]+(?:-п|-у|-и)\b", lowered):
+        return True
+    return re.search(
+        r"(?:положение|указание|инструкция)\s+банка\s+россии",
+        lowered,
+    ) is not None
+
+
 def mask_vnd_sensitive_data(text: str) -> str:
     """Замаскировать название предприятия, реквизиты, адреса и ФИО в тексте ВНД."""
     if not text or not text.strip():
         return text
 
-    result = text
+    protected, placeholders = protect_legal_references(text)
+    result = protected
     result = _apply_patterns(result, _LABELED_VALUE_PATTERNS)
     result = _apply_patterns(result, _ORG_QUOTED_PATTERNS)
     result = _apply_patterns(result, _STREET_PATTERNS)
     result = _mask_fio(result)
-    return result
+    return restore_legal_references(result, placeholders)
 
 
 def mask_vnd_chunks(chunks: List[str], chunk_size: int = 1000) -> List[str]:

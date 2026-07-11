@@ -56,6 +56,11 @@ def humanize_error(error: ErrorLike, context: Optional[str] = None) -> str:
 
     rules = (
         (
+            ("nameerror", "is not defined", "cannot import name", "importerror", "no module named"),
+            "На сервере устаревшая или неполная версия backend. Загрузите актуальные файлы "
+            "(main.py, create_vnd.py, search_vnd.py, vnd_masking.py) и перезапустите uvicorn.",
+        ),
+        (
             ("permission denied", "errno 13", "being used by another process"),
             "Не удалось сохранить файл: он открыт в другой программе (часто Adobe Acrobat). "
             "Закройте документ и повторите загрузку.",
