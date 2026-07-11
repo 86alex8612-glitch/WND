@@ -28,7 +28,7 @@
                         <li>Убедитесь, что справа отображается успешная загрузка и корректное название документа.</li>
                         <li>Нажмите <strong>«Начать анализ»</strong>. При необходимости система предложит скачать недостающие федеральные акты в папку <strong>FZ</strong>.</li>
                         <li>На этапе 1 уточните параметры организации и области законодательства.</li>
-                        <li>На этапе 2 получите правовой отчёт. Кнопка <strong>«Сохранить»</strong> записывает PDF в подпапку <strong>OUT</strong>.</li>
+                        <li>На этапе 2 получите правовой отчёт. Нажмите <strong>«Скачать отчёт (PDF)»</strong>, чтобы сохранить копию на компьютер.</li>
                     </ol>
                     <p class="analiz-guide-note">
                         ГОСТ и ФЗ загружаются в карточке <strong>«Статистика»</strong> на главном экране.
@@ -165,13 +165,12 @@
                             <h3 id="stage2-title">Правовой анализ</h3>
                         </div>
                         <div class="analiz-screen-hint">
-                            Ниже — результат правовой проверки. Нажмите <strong>«Сохранить»</strong>, чтобы записать отчёт в подпапку OUT рабочей папки,
-                            или <strong>«Скачать»</strong> для копии на компьютер. После завершения нажмите «Завершить».
+                            Ниже — результат правовой проверки. Нажмите <strong>«Скачать отчёт (PDF)»</strong> для копии на компьютер.
+                            После завершения нажмите «Завершить».
                         </div>
                         <div id="stage1-summary" class="stage1-summary"></div>
                         <div id="analysis-result" class="analysis-result"></div>
                         <div class="stage-footer-buttons">
-                            <button type="button" class="btn-success" id="btn-save-report" onclick="saveReportToWorkFolder()">Сохранить</button>
                             <button type="button" class="btn-primary" id="btn-download-report" onclick="downloadReport()">⬇ Скачать отчёт (PDF)</button>
                             <button type="button" class="btn-danger" onclick="finishAnalysis()">Завершить</button>
                         </div>
@@ -222,6 +221,6 @@
     <script src="/static/errors.js"></script>
     <script src="/static/config-ui.js?v=20260709d"></script>
     <script src="/static/downloads.js"></script>
-    <script src="/static/analiz.js?v=20260709d"></script>
+    <script src="/static/analiz.js?v=20260711a"></script>
 </body>
 </html>

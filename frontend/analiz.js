@@ -1205,40 +1205,6 @@ function getAnalysisReportPayload() {
     };
 }
 
-async function saveReportToWorkFolder() {
-    const payload = getAnalysisReportPayload();
-    if (!payload.content) {
-        alert('Нет результата анализа для сохранения. Дождитесь завершения правового анализа.');
-        return;
-    }
-
-    const reportName = payload.report_name;
-
-    const saveBtn = document.getElementById('btn-save-report');
-    const originalText = saveBtn ? saveBtn.textContent : 'Сохранить';
-    if (saveBtn) {
-        saveBtn.textContent = '⏳ Сохранение...';
-        saveBtn.disabled = true;
-    }
-
-    try {
-        const result = await saveDocumentToWorkFolder(
-            `${API_BASE}/api/report/save`,
-            payload,
-            'Не удалось сохранить отчёт',
-        );
-        alert(`✅ Отчёт сохранён в рабочую папку\n\n📁 ${result.filepath || result.filename}`);
-    } catch (error) {
-        console.error('Ошибка сохранения отчёта:', error);
-        alert(`❌ ${formatCaughtError(error, 'Не удалось сохранить отчёт')}`);
-    } finally {
-        if (saveBtn) {
-            saveBtn.textContent = originalText;
-            saveBtn.disabled = false;
-        }
-    }
-}
-
 async function downloadReport() {
     const payload = getAnalysisReportPayload();
     if (!payload.content) {
