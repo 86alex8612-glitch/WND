@@ -1846,7 +1846,7 @@ async def search_resolve_analysis(filename: str = "", source: str = ""):
 async def search_analysis_candidates(vnd_filename: str = ""):
     """Список отчётов анализа, подходящих к выбранному ВНД."""
     try:
-        from search_vnd import find_analysis_candidates
+        from search_vnd import find_analysis_candidates, find_auto_analysis_match
 
         filename = (vnd_filename or "").strip()
         if not filename:
