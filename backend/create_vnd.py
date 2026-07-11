@@ -1882,15 +1882,15 @@ def process_rework(
     analysis_meta: dict = {}
     effective_stage1 = stage1
 
-    if analysis_filename:
+    if (analysis_text or "").strip():
+        text = analysis_text.strip()
+        analysis_meta = {"from_text": True, "saved_to_file": False}
+    elif analysis_filename:
         from search_vnd import validate_analysis_for_main
 
         validate_analysis_for_main(main_filename, analysis_filename)
         text = read_create_file(analysis_filename)
         analysis_meta = {"uploaded_report": True, "filename": analysis_filename}
-    elif analysis_text:
-        text = analysis_text
-        analysis_meta = {"auto_analysis": True, "saved_to_file": False}
     else:
         if not stage1:
             raise ValueError("Для анализа без отчёта необходимы параметры этапа 1")

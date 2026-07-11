@@ -56,6 +56,11 @@ def humanize_error(error: ErrorLike, context: Optional[str] = None) -> str:
 
     rules = (
         (
+            ("отчёт анализа не найден", "отчет анализа не найден"),
+            "Отчёт анализа не найден на сервере. Выполните анализ ВНД заново и дождитесь сохранения в OUT, "
+            "или начните переработку без отчёта — будет выполнен автоматический анализ.",
+        ),
+        (
             ("nameerror", "is not defined", "cannot import name", "importerror", "no module named"),
             "На сервере устаревшая или неполная версия backend. Загрузите актуальные файлы "
             "(main.py, create_vnd.py, search_vnd.py, vnd_masking.py) и перезапустите uvicorn.",

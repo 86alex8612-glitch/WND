@@ -14,6 +14,7 @@ let stage1Data = null;
 let currentVndName = '';
 let lastStage1Answers = null;
 let lastAnalysisReport = '';
+let lastReportSavedToOut = false;
 let analysisInProgress = false;
 let stage1ProgressInterval = null;
 let stage2ProgressInterval = null;
@@ -778,6 +779,7 @@ function resetAnalysisState() {
     stage1Data = null;
     lastStage1Answers = null;
     lastAnalysisReport = '';
+    lastReportSavedToOut = false;
     analysisInProgress = false;
     uploadedDocumentText = null;
     uploadedDocumentName = null;
@@ -1120,6 +1122,8 @@ async function submitStage1() {
             lastStage1Answers = data.stage1;
             renderStage1Summary(data.stage1);
         }
+
+        await persistAnalysisReportToOut({ silent: true });
     } catch (error) {
         console.error('Ошибка этапа 2:', error);
         const message = error && error.name === 'AbortError'
@@ -1145,6 +1149,12 @@ window.submitStage1 = submitStage1;
 async function finishAnalysis() {
     if (!confirm('Завершить анализ и вернуться к загрузке документа?')) {
         return;
+    }
+
+    try {
+        await persistAnalysisReportToOut({ silent: true });
+    } catch (error) {
+        console.warn('Сохранение отчёта при завершении:', error);
     }
 
     resetAnalysisState();
@@ -1205,6 +1215,37 @@ function getAnalysisReportPayload() {
     };
 }
 
+/** Сохранить отчёт в OUT на сервере (как раньше кнопка «Сохранить»). */
+async function persistAnalysisReportToOut(options = {}) {
+    const silent = Boolean(options.silent);
+    const force = Boolean(options.force);
+
+    if (lastReportSavedToOut && !force) {
+        return { status: 'skipped' };
+    }
+
+    const payload = getAnalysisReportPayload();
+    if (!payload.content) {
+        return null;
+    }
+
+    try {
+        const result = await saveDocumentToWorkFolder(
+            `${API_BASE}/api/report/save`,
+            payload,
+            'Не удалось сохранить отчёт в OUT',
+        );
+        lastReportSavedToOut = true;
+        return result;
+    } catch (error) {
+        if (!silent) {
+            throw error;
+        }
+        console.warn('Автосохранение отчёта в OUT:', formatCaughtError(error, 'ошибка сохранения'));
+        return null;
+    }
+}
+
 async function downloadReport() {
     const payload = getAnalysisReportPayload();
     if (!payload.content) {
@@ -1229,6 +1270,7 @@ async function downloadReport() {
             'Не удалось скачать отчёт',
         );
         alert(`✅ Отчёт скачан и сохранён в подпапку OUT рабочей папки\n\n📄 ${filename}`);
+        lastReportSavedToOut = true;
     } catch (error) {
         console.error('Ошибка скачивания отчёта:', error);
         alert(`❌ ${formatCaughtError(error, 'Не удалось скачать отчёт')}`);
