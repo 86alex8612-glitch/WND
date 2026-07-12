@@ -52,7 +52,10 @@
                 <div class="create-upload-block">
                     <label>Основной (перерабатываемый) документ *</label>
                     <input type="file" id="rework-main-input" accept=".pdf,.docx,.doc,.txt" />
-                    <button class="btn-primary" onclick="uploadCreateFile('main')">Загрузить</button>
+                    <div class="create-upload-actions">
+                        <button class="btn-primary" onclick="uploadCreateFile('main')">Загрузить</button>
+                        <button type="button" class="btn-secondary" onclick="useDocumentFromIn()">Взять из IN (после анализа)</button>
+                    </div>
                     <div id="rework-main-status" class="upload-status"></div>
                 </div>
 
@@ -351,6 +354,6 @@
     <script src="/static/errors.js"></script>
     <script src="/static/config-ui.js?v=20260805"></script>
     <script src="/static/downloads.js"></script>
-    <script src="/static/create.js?v=20260710k"></script>
+    <script src="/static/create.js?v=20260712b"></script>
 </body>
 </html>

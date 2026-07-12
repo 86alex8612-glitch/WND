@@ -719,6 +719,15 @@ class CreateReworkGenerateRequest(BaseModel):
     analysis_meta: Optional[dict] = None
 
 
+class CreateImportFromInRequest(BaseModel):
+    filename: Optional[str] = ""
+
+
+class ResolveAnalysisRequest(BaseModel):
+    filename: str
+    source: Optional[str] = ""
+
+
 class CreateNewStage1Request(BaseModel):
     activity_sphere: str
     ownership_form: str
@@ -801,11 +810,15 @@ async def get_latest_vnd_file():
     """Получить имя последнего загруженного ВНД из папки IN."""
     try:
         from federal_refs import find_vnd_file
+        from path_config import read_paths
 
         latest = find_vnd_file()
+        paths = read_paths()
         return {
             "filename": latest.name,
             "file_path": str(latest),
+            "in_folder": paths["in_folder"],
+            "out_folder": paths["out_folder"],
         }
     except FileNotFoundError as e:
         raise HTTPException(status_code=404, detail=http_detail(e, "upload"))
@@ -994,6 +1007,30 @@ async def create_upload(
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=http_detail(e, "upload"))
+
+
+@app.post("/api/create/rework/import-from-in")
+async def create_rework_import_from_in(request: CreateImportFromInRequest):
+    """Подготовить документ для переработки из папки IN (после «Анализ ВНД»)."""
+    try:
+        from create_vnd import import_main_from_in
+
+        result = import_main_from_in(request.filename or "")
+        from path_config import read_paths
+
+        paths = read_paths()
+        return {
+            "message": "Документ подготовлен для переработки",
+            "in_folder": paths["in_folder"],
+            "out_folder": paths["out_folder"],
+            **result,
+        }
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=404, detail=http_detail(e, "upload"))
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=http_detail(e, "create"))
 
 
 @app.post("/api/create/rework/stage1")
@@ -1821,8 +1858,18 @@ async def search_load_document(request: SearchLoadDocumentRequest):
 
 
 @app.get("/api/search/resolve-analysis")
-async def search_resolve_analysis(filename: str = "", source: str = ""):
-    """Прочитать текст отчёта анализа из папки OUT, IN/create или search."""
+async def search_resolve_analysis_get(filename: str = "", source: str = ""):
+    """Прочитать текст отчёта анализа из папки OUT (или IN/search для диалога поиска)."""
+    return await _search_resolve_analysis(filename, source)
+
+
+@app.post("/api/search/resolve-analysis")
+async def search_resolve_analysis_post(request: ResolveAnalysisRequest):
+    """Прочитать текст отчёта анализа (POST — для имён с кириллицей)."""
+    return await _search_resolve_analysis(request.filename, request.source or "")
+
+
+async def _search_resolve_analysis(filename: str, source: str):
     try:
         from search_vnd import resolve_analysis_text
 
@@ -1836,7 +1883,7 @@ async def search_resolve_analysis(filename: str = "", source: str = ""):
             "text": text,
         }
     except FileNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=404, detail=http_detail(e, "upload"))
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except HTTPException:

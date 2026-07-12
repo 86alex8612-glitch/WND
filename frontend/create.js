@@ -51,7 +51,7 @@ const CREATE_INSTRUCTION_HTML = `
         <li>Нажмите <strong>«Загрузить»</strong> рядом с полем основного документа.</li>
         <li>Убедитесь, что статус загрузки показывает успех (✓).</li>
         <li>При необходимости уточните <strong>«Название документа»</strong> в текстовом поле.</li>
-        <li>Дождитесь автоматического подбора <strong>отчёта анализа</strong> (по имени файла из папок OUT и IN).
+        <li>Дождитесь автоматического подбора <strong>отчёта анализа</strong> (по имени файла из папки <strong>OUT</strong>).
             <ul>
                 <li>Если подходящий отчёт не найден, система выполнит <strong>автоматический правовой анализ</strong> при переработке.</li>
                 <li>Чтобы использовать другой отчёт, выберите файл и нажмите <strong>«Загрузить другой отчёт»</strong>.</li>
@@ -59,7 +59,7 @@ const CREATE_INSTRUCTION_HTML = `
         </li>
         <li>Нажмите <strong>«Начать предварительный анализ»</strong> (кнопка активна после успешной загрузки основного документа).</li>
     </ol>
-    <blockquote><strong>Обезличивание:</strong> основной документ при чтении с сервера (папка IN/create) автоматически обезличивается перед анализом и генерацией.</blockquote>
+    <blockquote><strong>Обезличивание:</strong> основной документ (ВНД из папки IN) автоматически обезличивается перед анализом и генерацией.</blockquote>
 
     <h5>Шаг 3. Анкета параметров</h5>
     <ol>
@@ -562,9 +562,14 @@ async function autoLoadReworkAnalysis(originalFilename) {
             return;
         }
 
-        const resolveResponse = await fetch(
-            `${API_BASE}/api/search/resolve-analysis?filename=${encodeURIComponent(best.filename)}&source=${encodeURIComponent(best.source)}`
-        );
+        const resolveResponse = await fetch(`${API_BASE}/api/search/resolve-analysis`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                filename: best.filename,
+                source: best.source || '',
+            }),
+        });
         if (!resolveResponse.ok) {
             throw new Error(await readApiError(resolveResponse, 'Не удалось прочитать отчёт анализа'));
         }
@@ -697,6 +702,24 @@ function showReworkMode() {
     const formStep = document.getElementById('rework-step-form');
     if (formStep) formStep.style.display = 'none';
     showReworkStep('prep');
+    autoImportFromInIfAvailable();
+}
+
+async function autoImportFromInIfAvailable() {
+    if (mainFilename) return;
+
+    try {
+        const latestResponse = await fetch(`${API_BASE}/api/vnd/latest-file`);
+        if (!latestResponse.ok) return;
+
+        const latest = await latestResponse.json();
+        const sourceName = (latest.filename || '').trim();
+        if (!sourceName) return;
+
+        await useDocumentFromIn(sourceName);
+    } catch (error) {
+        console.warn('Автоподготовка документа из IN:', error);
+    }
 }
 
 function showReworkStep(step) {
@@ -1328,14 +1351,17 @@ async function uploadCreateFile(kind) {
                 document.getElementById('rework-vnd-name').value = file.name.replace(/\.[^/.]+$/, '');
             }
             updateReworkPrefillButton();
+            status.textContent = `✓ ВНД загружен в IN/: ${data.filename}`;
+            status.className = 'upload-status success';
             await autoLoadReworkAnalysis(file.name);
+            return;
         } else {
             analysisFilename = data.filename;
             analysisText = null;
             analysisAutoMatched = false;
+            status.textContent = `✓ Отчёт загружен в OUT/: ${data.filename}`;
+            status.className = 'upload-status success';
         }
-        status.textContent = `✓ Загружен: ${data.filename}`;
-        status.className = 'upload-status success';
     } catch (error) {
         if (kind === 'analysis') {
             analysisFilename = null;
@@ -1526,6 +1552,91 @@ async function goToReworkForm() {
     }
 }
 
+async function useDocumentFromIn(filename) {
+    const status = document.getElementById('rework-main-status');
+    if (status) {
+        status.textContent = '⏳ Подготовка документа из папки IN...';
+        status.className = 'upload-status';
+    }
+
+    try {
+        let sourceName = (filename || '').trim();
+        if (!sourceName) {
+            const latestResponse = await fetch(`${API_BASE}/api/vnd/latest-file`);
+            if (!latestResponse.ok) {
+                throw new Error(await readApiError(
+                    latestResponse,
+                    'В папке IN нет документа. Сначала выполните «Анализ ВНД» или загрузите файл вручную.',
+                ));
+            }
+            const latest = await latestResponse.json();
+            sourceName = latest.filename || '';
+        }
+
+        const importResponse = await fetch(`${API_BASE}/api/create/rework/import-from-in`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ filename: sourceName }),
+        });
+        if (!importResponse.ok) {
+            throw new Error(await readApiError(importResponse, 'Не удалось подготовить документ из IN'));
+        }
+
+        const data = await importResponse.json();
+        mainFilename = data.filename;
+        reworkFormReady = false;
+
+        const vndNameInput = document.getElementById('rework-vnd-name');
+        if (vndNameInput && !vndNameInput.value) {
+            vndNameInput.value = sourceName.replace(/\.[^/.]+$/, '');
+        }
+
+        if (status) {
+            status.textContent = `✓ ВНД из IN/: ${data.filename}`;
+            status.className = 'upload-status success';
+        }
+
+        updateReworkPrefillButton();
+        await autoLoadReworkAnalysis(sourceName);
+    } catch (error) {
+        if (status) {
+            status.textContent = '✗ ' + formatCaughtError(error, 'Не удалось взять документ из IN');
+            status.className = 'upload-status error';
+        }
+    }
+}
+
+function isReworkNotFoundError(error) {
+    const message = formatCaughtError(error, '').toLowerCase();
+    return (
+        message.includes('не найден')
+        || message.includes('запрашиваемые данные не найдены')
+        || message.includes('status: 404')
+        || message.includes('404')
+    );
+}
+
+async function runReworkPipeline(mainFilename, vndName, stage1, hasAnalysis) {
+    if (hasAnalysis) {
+        try {
+            return await runReworkWithUploadedAnalysis(mainFilename, vndName, stage1);
+        } catch (error) {
+            if (!isReworkNotFoundError(error)) {
+                throw error;
+            }
+            analysisFilename = null;
+            analysisText = null;
+            analysisAutoMatched = false;
+            showProgressBlock(
+                'rework-progress',
+                'Отчёт не найден на сервере. Выполняется правовой анализ...',
+            );
+        }
+    }
+
+    return runReworkAnalyzeAndGenerate(mainFilename, vndName, stage1);
+}
+
 async function runReworkAnalyzeAndGenerate(mainFilename, vndName, stage1) {
     showProgressBlock('rework-progress', 'Выполняется правовой анализ документа...');
 
@@ -1628,7 +1739,9 @@ async function runReworkFromForm() {
     const vndName = form.document_name || document.getElementById('rework-vnd-name')?.value || '';
     const progress = document.getElementById('rework-progress');
     const resultPanel = document.getElementById('rework-result-panel');
-    const hasAnalysis = Boolean(analysisFilename || analysisText);
+    const hasAnalysis = Boolean(
+        analysisFilename || (analysisText && analysisText.trim())
+    );
     const stage1 = reworkFormToStage1(form);
 
     if (btn) btn.disabled = true;
@@ -1638,9 +1751,7 @@ async function runReworkFromForm() {
         : 'Выполняется правовой анализ документа...');
 
     try {
-        const data = hasAnalysis
-            ? await runReworkWithUploadedAnalysis(mainFilename, vndName, stage1)
-            : await runReworkAnalyzeAndGenerate(mainFilename, vndName, stage1);
+        const data = await runReworkPipeline(mainFilename, vndName, stage1, hasAnalysis);
 
         completeProgress('rework-progress');
         if (progress) progress.style.display = 'none';
@@ -1814,6 +1925,7 @@ window.showReworkMode = showReworkMode;
 window.showNewMode = showNewMode;
 window.backToCreateMenu = backToCreateMenu;
 window.uploadCreateFile = uploadCreateFile;
+window.useDocumentFromIn = useDocumentFromIn;
 window.startRework = runReworkFromForm;
 window.runNewGoToFollowup = runNewGoToFollowup;
 window.runNewAnalyze = runNewAnalyze;

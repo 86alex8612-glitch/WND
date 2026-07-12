@@ -179,21 +179,24 @@ def _is_analysis_report_file(path: Path) -> bool:
     return name_lower.startswith("analysis_")
 
 
-def _analysis_search_roots() -> List[tuple]:
-    roots = [
-        ("out", Path(settings.out_folder)),
-        ("create", Path(settings.in_folder) / "create"),
-        ("search", ensure_search_folder()),
-    ]
+def _analysis_search_roots(include_search_uploads: bool = False) -> List[tuple]:
+    """Корни поиска отчётов: OUT — основное хранилище; search — только для диалога «Поиск в ВНД»."""
+    roots: List[tuple] = [("out", Path(settings.out_folder))]
+    if include_search_uploads:
+        roots.append(("search", ensure_search_folder()))
     return roots
 
 
-def find_analysis_candidates(vnd_filename: str) -> List[dict]:
-    """Найти отчёты анализа, подходящие к выбранному ВНД."""
+def find_analysis_candidates(
+    vnd_filename: str,
+    *,
+    include_search_uploads: bool = False,
+) -> List[dict]:
+    """Найти отчёты анализа в OUT/, подходящие к выбранному ВНД."""
     safe_vnd = os.path.basename(vnd_filename or "")
     candidates: List[dict] = []
 
-    for source, folder in _analysis_search_roots():
+    for source, folder in _analysis_search_roots(include_search_uploads):
         if not folder.is_dir():
             continue
         for path in folder.iterdir():
@@ -229,7 +232,7 @@ def find_auto_analysis_match(vnd_filename: str) -> Optional[dict]:
 
 
 def resolve_analysis_text(filename: str, source: Optional[str] = None) -> tuple[str, str, str]:
-    """Прочитать текст отчёта анализа из известной папки."""
+    """Прочитать текст отчёта анализа из OUT/ (или IN/search/ для диалога поиска)."""
     safe_name = os.path.basename((filename or "").strip())
     if not safe_name:
         raise ValueError("Укажите имя отчёта анализа")
@@ -239,12 +242,10 @@ def resolve_analysis_text(filename: str, source: Optional[str] = None) -> tuple[
 
     if normalized_source == "out":
         path = Path(settings.out_folder) / safe_name
-    elif normalized_source == "create":
-        path = Path(settings.in_folder) / "create" / safe_name
     elif normalized_source == "search":
         path = ensure_search_folder() / safe_name
     else:
-        for src, folder in _analysis_search_roots():
+        for src, folder in _analysis_search_roots(include_search_uploads=True):
             candidate = folder / safe_name
             if candidate.is_file():
                 path = candidate
@@ -252,7 +253,7 @@ def resolve_analysis_text(filename: str, source: Optional[str] = None) -> tuple[
                 break
 
     if not path or not path.is_file():
-        raise FileNotFoundError(f"Отчёт анализа не найден: {safe_name}")
+        raise FileNotFoundError(f"Отчёт анализа не найден в OUT: {safe_name}")
 
     text = extract_full_text(str(path))[:50000]
     if not text.strip():
@@ -322,7 +323,7 @@ def load_search_session(
         }
     )
 
-    candidates = find_analysis_candidates(filename)
+    candidates = find_analysis_candidates(filename, include_search_uploads=True)
     result["analysis_candidates"] = [
         {
             "filename": item["filename"],

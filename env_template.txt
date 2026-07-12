@@ -7,7 +7,8 @@ OPENAI_API_KEY=your_api_key_here
 # Secret key для приложения
 SECRET_KEY=your_secret_key_here
 
+# Корень данных на сервере (Linux / Beget) — имеет приоритет над config.cfg
+WND_DATA_ROOT=/opt/WND/data
 
-
-
-
+# Windows (локально): WND_DATA_ROOT=C:\WND
+# Либо задайте data_win в config.cfg без переменной окружения

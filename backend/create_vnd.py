@@ -21,7 +21,6 @@ from document_loader import extract_full_text
 
 logger = logging.getLogger("create_vnd")
 
-CREATE_FOLDER = Path(settings.in_folder) / "create"
 GOST_QUERY = (
     "ГОСТ Р 7.0.97-2025 Система стандартов по информации "
     "организационно-распорядительная документация требования к оформлению"
@@ -262,28 +261,113 @@ CREATE_QA_WELCOME = (
 )
 
 
-def ensure_create_folder() -> Path:
-    CREATE_FOLDER.mkdir(parents=True, exist_ok=True)
-    return CREATE_FOLDER
+def get_in_folder() -> Path:
+    """Папка IN — загруженные ВНД (config.cfg: data_root / data_win)."""
+    return Path(settings.in_folder)
+
+
+def get_out_folder() -> Path:
+    """Папка OUT — отчёты анализа."""
+    return Path(settings.out_folder)
+
+
+def _resolve_vnd_file_path(filename: str) -> Path:
+    """Найти ВНД только в IN/."""
+    safe = os.path.basename((filename or "").strip())
+    if not safe:
+        raise FileNotFoundError("Файл не указан")
+
+    in_path = get_in_folder() / safe
+    if in_path.is_file():
+        return in_path
+
+    original = re.sub(r"^main_\d{8}_\d{6}_", "", safe, flags=re.IGNORECASE)
+    if original and original != safe:
+        alt = get_in_folder() / original
+        if alt.is_file():
+            return alt
+
+    from federal_refs import find_vnd_file
+
+    try:
+        return find_vnd_file(safe)
+    except FileNotFoundError as exc:
+        raise FileNotFoundError(
+            f"ВНД не найден в {get_in_folder()}: {safe}. "
+            "Загрузите документ вручную или нажмите «Взять из IN (после анализа)»."
+        ) from exc
+
+
+def _save_to_in_folder(filename: str, content: bytes) -> Path:
+    """Сохранить ВНД в IN/."""
+    safe = os.path.basename(filename or "document")
+    in_folder = get_in_folder()
+    in_folder.mkdir(parents=True, exist_ok=True)
+    target = in_folder / safe
+    target.write_bytes(content)
+    return target
+
+
+def _save_to_out_folder(filename: str, content: bytes) -> Path:
+    """Сохранить отчёт анализа в OUT/."""
+    safe = os.path.basename(filename or "analysis")
+    out_folder = get_out_folder()
+    out_folder.mkdir(parents=True, exist_ok=True)
+    target = out_folder / safe
+    target.write_bytes(content)
+    return target
+
+
+def import_main_from_in(filename: str) -> dict:
+    """Подключить ВНД из IN/ (без копирования в другие папки)."""
+    in_path = _resolve_vnd_file_path(filename)
+    return {
+        "filename": in_path.name,
+        "file_path": str(in_path),
+        "in_folder": str(get_in_folder()),
+        "kind": "main",
+    }
 
 
 def save_create_upload(filename: str, content: bytes, kind: str) -> dict:
-    """Сохранить файл для создания ВНД в IN/create/."""
-    ensure_create_folder()
+    """Загрузить файл: main → IN/, analysis → OUT/."""
+    if kind == "main":
+        return save_main_for_rework(filename, content)
+
+    out_path = _save_to_out_folder(filename, content)
+    return {
+        "filename": out_path.name,
+        "file_path": str(out_path),
+        "out_folder": str(get_out_folder()),
+        "kind": "analysis",
+        "source": "out",
+    }
+
+
+def save_main_for_rework(filename: str, content: bytes) -> dict:
+    """Сохранить основной ВНД для переработки в IN/."""
     safe = os.path.basename(filename or "document")
-    stem, ext = os.path.splitext(safe)
-    prefix = "main" if kind == "main" else "analysis"
-    stamped = f"{prefix}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{stem}{ext}"
-    path = CREATE_FOLDER / stamped
-    path.write_bytes(content)
-    return {"filename": stamped, "file_path": str(path), "kind": kind}
+    in_path = _save_to_in_folder(safe, content)
+    return {
+        "filename": in_path.name,
+        "file_path": str(in_path),
+        "in_folder": str(get_in_folder()),
+        "kind": "main",
+    }
 
 
 def read_create_file(filename: str, max_chars: int = 80000) -> str:
-    path = ensure_create_folder() / os.path.basename(filename)
-    if not path.is_file():
-        raise FileNotFoundError(f"Файл не найден: {filename}")
+    """Прочитать текст ВНД из IN/."""
+    path = _resolve_vnd_file_path(filename)
     return extract_full_text(str(path))[:max_chars]
+
+
+def read_analysis_report_file(filename: str, max_chars: int = 50000) -> str:
+    """Прочитать текст отчёта анализа из OUT/."""
+    from search_vnd import resolve_analysis_text
+
+    text, _, _ = resolve_analysis_text(filename, "out")
+    return text[:max_chars]
 
 
 def get_create_options() -> dict:
@@ -432,7 +516,7 @@ def _prepare_federal_refs_context(main_filename: str, main_text: str) -> tuple[s
     """Контекст по ссылкам в документе + попытка подкачки отсутствующих."""
     from federal_refs import detect_federal_references_from_file
 
-    path = ensure_create_folder() / os.path.basename(main_filename)
+    path = _resolve_vnd_file_path(main_filename)
     refs_result = detect_federal_references_from_file(str(path))
     missing = refs_result.get("missing_references") or []
 
@@ -456,7 +540,7 @@ def _prepare_federal_refs_context(main_filename: str, main_text: str) -> tuple[s
 
 def _ensure_rework_federal_refs(main_filename: str) -> dict:
     """Подготовить федеральные ссылки как в карточке «Анализ ВНД» (без сохранения отчёта)."""
-    path = ensure_create_folder() / os.path.basename(main_filename)
+    path = _resolve_vnd_file_path(main_filename)
     from federal_refs import detect_federal_references_from_file
 
     refs_result = detect_federal_references_from_file(str(path))
@@ -538,7 +622,7 @@ def detect_rework_stage1(
     extra = (analysis_text or "").strip()
     if not extra and analysis_filename:
         try:
-            extra = read_create_file(analysis_filename)
+            extra = read_analysis_report_file(analysis_filename)
         except Exception:
             extra = ""
     if extra:
@@ -607,7 +691,7 @@ def _read_rework_combined_text(
     extra = (analysis_text or "").strip()
     if not extra and analysis_filename:
         try:
-            extra = read_create_file(analysis_filename)
+            extra = read_analysis_report_file(analysis_filename)
         except Exception:
             extra = ""
     if extra:
@@ -1889,7 +1973,7 @@ def process_rework(
         from search_vnd import validate_analysis_for_main
 
         validate_analysis_for_main(main_filename, analysis_filename)
-        text = read_create_file(analysis_filename)
+        text = read_analysis_report_file(analysis_filename)
         analysis_meta = {"uploaded_report": True, "filename": analysis_filename}
     else:
         if not stage1:

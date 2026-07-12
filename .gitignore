@@ -11,6 +11,7 @@ ENV/
 
 # Environment variables
 .env
+config.cfg
 
 # Database
 *.db
