@@ -41,6 +41,7 @@ from error_messages import humanize_error, http_detail
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FRONTEND_DIR = os.path.join(BASE_DIR, "frontend")
 USER_INSTRUCTION_FILE = os.path.join(BASE_DIR, "ИНСТРУКЦИЯ_ПОЛЬЗОВАТЕЛЯ.md")
+CREATE_INSTRUCTION_FILE = os.path.join(BASE_DIR, "ИНСТРУКЦИЯ_ПОМОЩНИК_ВНД.md")
 HTML_NO_CACHE_HEADERS = {
     "Cache-Control": "no-cache, no-store, must-revalidate",
     "Pragma": "no-cache",
@@ -229,17 +230,30 @@ async def create_page():
 @app.get("/api/user-instruction")
 async def user_instruction():
     """Текст инструкции пользователя из файла проекта"""
-    if not os.path.isfile(USER_INSTRUCTION_FILE):
-        raise HTTPException(status_code=404, detail="Файл инструкции пользователя не найден")
+    return _read_instruction_payload(USER_INSTRUCTION_FILE, "Инструкция пользователя")
+
+
+@app.get("/api/create-instruction")
+async def create_instruction():
+    """Текст инструкции карточки «Помощник в создании ВНД»"""
+    return _read_instruction_payload(
+        CREATE_INSTRUCTION_FILE,
+        "Инструкция: Помощник в создании ВНД",
+    )
+
+
+def _read_instruction_payload(file_path: str, default_title: str) -> dict:
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Файл инструкции не найден")
     try:
-        with open(USER_INSTRUCTION_FILE, "r", encoding="utf-8") as file:
+        with open(file_path, "r", encoding="utf-8") as file:
             content = file.read()
     except OSError as exc:
         raise HTTPException(status_code=500, detail=http_detail(exc, "instruction_load"))
     return {
-        "title": "Инструкция пользователя",
+        "title": default_title,
         "content": content,
-        "mtime": os.path.getmtime(USER_INSTRUCTION_FILE),
+        "mtime": os.path.getmtime(file_path),
     }
 
 

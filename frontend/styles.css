@@ -24,6 +24,7 @@ body {
     padding: 7.5px 0;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     flex-shrink: 0;
+    position: relative;
 }
 
 .header-content {
@@ -59,14 +60,18 @@ body {
 }
 
 .create-ui-version {
-    display: inline-block;
-    padding: 4px 8px;
-    border-radius: 3px;
-    background: #e9ecef;
-    color: #495057;
-    font-size: 0.75rem;
-    font-weight: 600;
-    letter-spacing: 0.02em;
+    position: absolute;
+    right: 6px;
+    bottom: 3px;
+    padding: 0;
+    background: none;
+    color: rgba(255, 255, 255, 0.42);
+    font-size: 0.58rem;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1;
+    pointer-events: none;
+    user-select: none;
 }
 
 .header h1 {

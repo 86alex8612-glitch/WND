@@ -27,107 +27,8 @@ const CREATE_QA_WELCOME =
     'Здравствуйте! Задайте вопрос по подготовленному документу — ' +
     'поясню статьи, структуру, правовые основания и места для самостоятельного заполнения.';
 
-const CREATE_INSTRUCTION_HTML = `
-    <p><strong>ВНД</strong> — внутренний нормативный документ организации. Помощник работает в двух режимах:</p>
-    <ul>
-        <li><strong>Переработка</strong> — загрузите документ и отчёт анализа (подберётся автоматически). Параметры заполнятся из файлов, затем система сформирует улучшенный текст и отчёт об изменениях.</li>
-        <li><strong>Новый документ</strong> — пошаговая анкета, правовой анализ и генерация шаблона ВНД.</li>
-    </ul>
-    <p>Нормативная база (ГОСТ и ФЗ) загружается в карточке «Статистика» на главном экране. Готовый результат можно скачать на ваш компьютер.</p>
-    <p><strong>Переработка по шагам:</strong> загрузите основной документ → проверьте подобранный отчёт анализа и автозаполненные параметры → нажмите «Начать переработку». Если отчёта нет, будет выполнен автоматический правовой анализ.</p>
-    <p><strong>Подробнее ..</strong></p>
-
-    <h4>6.1. Режим «Переработать документ»</h4>
-
-    <h5>Шаг 1. Выбор режима</h5>
-    <ol>
-        <li>Откройте карточку <strong>«Помощник в создании ВНД»</strong> на главном экране.</li>
-        <li>Нажмите <strong>«Переработать документ»</strong>.</li>
-    </ol>
-
-    <h5>Шаг 2. Подготовка документа</h5>
-    <ol>
-        <li>В блоке <strong>«Подготовка документа»</strong> нажмите <strong>«Выберите файл»</strong> в поле основного документа (или выберите файл в стандартном диалоге).</li>
-        <li>Нажмите <strong>«Загрузить»</strong> рядом с полем основного документа.</li>
-        <li>Убедитесь, что статус загрузки показывает успех (✓).</li>
-        <li>При необходимости уточните <strong>«Название документа»</strong> в текстовом поле.</li>
-        <li>Дождитесь автоматического подбора <strong>отчёта анализа</strong> (по имени файла из папки <strong>OUT</strong>).
-            <ul>
-                <li>Если подходящий отчёт не найден, система выполнит <strong>автоматический правовой анализ</strong> при переработке.</li>
-                <li>Чтобы использовать другой отчёт, выберите файл и нажмите <strong>«Загрузить другой отчёт»</strong>.</li>
-            </ul>
-        </li>
-        <li>Нажмите <strong>«Начать предварительный анализ»</strong> (кнопка активна после успешной загрузки основного документа).</li>
-    </ol>
-    <blockquote><strong>Обезличивание:</strong> основной документ (ВНД из папки IN) автоматически обезличивается перед анализом и генерацией.</blockquote>
-
-    <h5>Шаг 3. Анкета параметров</h5>
-    <ol>
-        <li>Проверьте автоматически заполненные поля (9 пунктов: название, тема, область законодательства, сфера деятельности, форма собственности, гостайна, численность, филиалы, аудитория).</li>
-        <li>Исправьте неточности; обращайте внимание на подсветку обязательных полей.</li>
-        <li>Нажмите <strong>«Начать переработку»</strong>.</li>
-    </ol>
-
-    <h5>Шаг 4. Ожидание и результат</h5>
-    <ol>
-        <li>Дождитесь завершения процесса (при отсутствии отчёта сначала выполняется правовой анализ, затем генерация — это может занять несколько минут).</li>
-        <li>На экране появятся:
-            <ul>
-                <li><strong>Отчёт о переработке</strong></li>
-                <li>кнопки <strong>«Показать документ»</strong> и <strong>«Задать вопросы»</strong> — текст и диалог в одном окне</li>
-            </ul>
-        </li>
-        <li>Действия:
-            <ul>
-                <li><strong>«Показать документ»</strong> или <strong>«Задать вопросы»</strong> — открыть окно с текстом документа и диалогом вопросов;</li>
-                <li><strong>«Скачать»</strong> — сохранить DOCX на компьютер;</li>
-                <li><strong>«Задать вопросы»</strong> — открыть диалог по содержанию документа;</li>
-                <li><strong>«Завершить»</strong> — выйти на главный экран (если документ не скачан, он не сохранится на компьютере).</li>
-            </ul>
-        </li>
-    </ol>
-
-    <h4>6.2. Режим «Создать новый»</h4>
-
-    <h5>Шаг 1. Выбор режима</h5>
-    <ol>
-        <li>На стартовом экране помощника нажмите <strong>«Создать новый»</strong>.</li>
-    </ol>
-
-    <h5>Шаг 2. Основная анкета</h5>
-    <ol>
-        <li>Заполните все 9 полей (название, тема, область законодательства, сфера деятельности, форма собственности, отношение к гостайне, численность сотрудников, филиалы, целевая аудитория).</li>
-        <li>Используйте подсказки в правой колонке при выборе области законодательства и сферы деятельности.</li>
-        <li>Нажмите <strong>«Далее»</strong>.</li>
-    </ol>
-    <blockquote>В этом режиме реальный ВНД с реквизитами организации <strong>не загружается</strong>. Наименование организации в шаблоне подставляется условное (например, <code>ООО «DialogAI»</code>).</blockquote>
-
-    <h5>Шаг 3. Уточняющие вопросы</h5>
-    <ol>
-        <li>Ответьте на дополнительные вопросы (зависят от выбранной области законодательства: трансграничная передача, основания обработки ПДн и др.).</li>
-        <li>Нажмите <strong>«Начать анализ»</strong>.</li>
-        <li>Дождитесь <strong>результата правового анализа</strong> вводных данных.</li>
-        <li>Нажмите <strong>«Продолжить»</strong> для генерации шаблона.</li>
-    </ol>
-
-    <h5>Шаг 4. Генерация и результат</h5>
-    <ol>
-        <li>Дождитесь формирования <strong>шаблона</strong> ВНД (отображается индикатор прогресса).</li>
-        <li>Просмотрите текст шаблона на экране.</li>
-        <li><strong>«Скачать»</strong> — получить DOCX-шаблон на компьютер.</li>
-        <li><strong>«Показать документ»</strong> / <strong>«Задать вопросы»</strong> — просмотр текста и диалог в одном окне.</li>
-        <li><strong>«Задать вопросы»</strong> / <strong>«Завершить»</strong> — по аналогии с режимом переработки.</li>
-    </ol>
-    <blockquote>Перед применением в организации замените условное наименование предприятия, укажите реальные реквизиты и согласуйте текст с профильными специалистами.</blockquote>
-
-    <h4>Диалог «Задать вопросы» (оба режима)</h4>
-    <ol>
-        <li>Нажмите <strong>«Показать документ»</strong> или <strong>«Задать вопросы»</strong> — откроется окно: слева текст документа, справа диалог.</li>
-        <li>Введите вопрос в поле справа и нажмите <strong>«Отправить»</strong> (или Enter).</li>
-        <li>Для сохранения переписки нажмите <strong>«Скачать диалог»</strong> внизу окна.</li>
-        <li>Закройте окно кнопкой <strong>«Закрыть»</strong>.</li>
-    </ol>
-`;
+let createInstructionCache = '';
+let createInstructionLoading = false;
 
 function escapeHtml(text) {
     return String(text)
@@ -205,10 +106,6 @@ document.addEventListener('DOMContentLoaded', () => {
     updateReworkPrefillButton();
     setupReworkFormValidationRefresh();
     setReworkAnalysisControlsEnabled(true);
-    const instructionBody = document.getElementById('create-instruction-body');
-    if (instructionBody) {
-        instructionBody.innerHTML = CREATE_INSTRUCTION_HTML;
-    }
     const qaInput = document.getElementById('create-qa-input');
     if (qaInput) {
         qaInput.addEventListener('keydown', (event) => {
@@ -415,11 +312,60 @@ function setSelectValue(id, value) {
     }
 }
 
-function openCreateInstructionModal() {
+async function loadCreateInstructionContent(forceReload = false) {
+    if (!forceReload && createInstructionCache) {
+        return createInstructionCache;
+    }
+    if (createInstructionLoading) {
+        return createInstructionCache;
+    }
+
+    createInstructionLoading = true;
+    try {
+        const response = await fetch(`${API_BASE}/api/create-instruction?t=${Date.now()}`);
+        if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.detail || 'Не удалось загрузить инструкцию');
+        }
+        const data = await response.json();
+        createInstructionCache = renderInstructionMarkdown(data.content || '');
+        const titleEl = document.getElementById('create-instruction-title');
+        if (titleEl && data.title) {
+            titleEl.textContent = data.title;
+        }
+        return createInstructionCache;
+    } finally {
+        createInstructionLoading = false;
+    }
+}
+
+function setCreateInstructionBody(html, isError = false) {
+    const body = document.getElementById('create-instruction-body');
+    if (!body) {
+        return;
+    }
+    body.innerHTML = html;
+    body.classList.toggle('user-instruction-body-error', isError);
+}
+
+async function openCreateInstructionModal() {
     const modal = document.getElementById('create-instruction-modal');
     if (!modal) return;
+
     modal.hidden = false;
     modal.setAttribute('aria-hidden', 'false');
+    setCreateInstructionBody('<p class="user-instruction-loading">Загрузка инструкции…</p>');
+
+    try {
+        const html = await loadCreateInstructionContent();
+        setCreateInstructionBody(html);
+    } catch (error) {
+        const message = formatCaughtError(error, 'Не удалось загрузить инструкцию');
+        setCreateInstructionBody(
+            `<p class="user-instruction-error">${escapeInstructionHtml(message)}</p>`,
+            true,
+        );
+    }
 }
 
 function closeCreateInstructionModal() {

@@ -7,18 +7,18 @@
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
     <title>Помощник в создании ВНД - НейроКонсультант</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260710k">
+    <link rel="stylesheet" href="/static/styles.css?v=20260712d">
 </head>
 <body>
     <header class="header">
         <div class="header-content">
             <h1>НейроКонсультант по организационно-распорядительным документам</h1>
             <div class="header-actions">
-                <span class="create-ui-version" title="Версия интерфейса помощника">UI 20260805</span>
                 <button type="button" class="btn-header-instruction" onclick="openCreateInstructionModal()" title="Инструкция по карточке «Помощник в создании ВНД»">📖 Инструкция по карточке</button>
                 <button class="btn-back" onclick="window.location.href='/'">← Назад</button>
             </div>
         </div>
+        <span class="create-ui-version" title="Версия интерфейса">12.07</span>
     </header>
 
     <main class="analiz-content">
@@ -53,7 +53,7 @@
                     <label>Основной (перерабатываемый) документ *</label>
                     <input type="file" id="rework-main-input" accept=".pdf,.docx,.doc,.txt" />
                     <div class="create-upload-actions">
-                        <button class="btn-primary" onclick="uploadCreateFile('main')">Загрузить</button>
+                        <button class="btn-primary" onclick="uploadCreateFile('main')">Загрузить с ПК</button>
                         <button type="button" class="btn-secondary" onclick="useDocumentFromIn()">Взять из IN (после анализа)</button>
                     </div>
                     <div id="rework-main-status" class="upload-status"></div>
@@ -61,7 +61,7 @@
 
                 <div class="create-upload-block">
                     <label>Отчёт анализа документа</label>
-                    <p class="stage-subtitle create-upload-hint">Документы подбираются из подпапок OUT и IN. ГОСТ и ФЗ — в карточке «Статистика» на главном экране.</p>
+                    <p class="stage-subtitle create-upload-hint">Отчёты анализа подбираются из папки OUT. ГОСТ и ФЗ — в карточке «Статистика» на главном экране.</p>
                     <label class="stage1-checkbox-option create-analysis-none-option">
                         <input type="checkbox" id="rework-analysis-none" onchange="toggleReworkAnalysisNone()" />
                         <span>Нет отчёта анализа</span>
@@ -352,8 +352,9 @@
     </div>
 
     <script src="/static/errors.js"></script>
+    <script src="/static/instruction-markdown.js?v=20260712"></script>
     <script src="/static/config-ui.js?v=20260805"></script>
     <script src="/static/downloads.js"></script>
-    <script src="/static/create.js?v=20260712b"></script>
+    <script src="/static/create.js?v=20260712d"></script>
 </body>
 </html>
