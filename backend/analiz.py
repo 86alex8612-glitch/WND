@@ -132,8 +132,11 @@ def get_relevant_context(
                             except Exception as e:
                                 logger.warning(f"Не удалось получить дату создания файла: {e}")
                         
+                        from vnd_masking import mask_vnd_sensitive_data
+
+                        masked_doc = mask_vnd_sensitive_data(result["document"][:500])
                         context_parts.append(f"📄 Документ: {filename}{file_date_info}")
-                        context_parts.append(f"Текст: {result['document'][:500]}")
+                        context_parts.append(f"Текст: {masked_doc}")
                         context_parts.append("")
                 else:
                     logger.warning("В базе ВНД результатов не найдено")
@@ -176,9 +179,12 @@ def get_relevant_context(
                 if vnd_results:
                     logger.info(f"Найдено {len(vnd_results)} результатов в базе ВНД")
                     context_parts.append("=== ВНУТРЕННИЕ ДОКУМЕНТЫ ===")
+                    from vnd_masking import mask_vnd_sensitive_data
+
                     for result in vnd_results:
+                        masked_doc = mask_vnd_sensitive_data(result["document"][:500])
                         context_parts.append(f"Документ: {result['metadata'].get('filename', 'N/A')}")
-                        context_parts.append(f"Текст: {result['document'][:500]}")
+                        context_parts.append(f"Текст: {masked_doc}")
                         context_parts.append("")
                 else:
                     logger.debug("В базе ВНД результатов не найдено")
@@ -245,10 +251,12 @@ def format_history(history: list, max_messages: int = 6) -> str:
 
 
 def resolve_vnd_text(message: dict) -> Optional[str]:
-    """Получить текст ВНД из запроса или из файла в папке IN."""
+    """Получить обезличенный текст ВНД из запроса или из файла в папке IN."""
+    from vnd_masking import mask_vnd_sensitive_data
+
     inline = message.get("vnd_text")
     if inline:
-        return str(inline)[:80000]
+        return mask_vnd_sensitive_data(str(inline))[:80000]
 
     filename = message.get("vnd_filename")
     if not filename:
@@ -263,7 +271,8 @@ def resolve_vnd_text(message: dict) -> Optional[str]:
         return None
 
     try:
-        return extract_full_text(str(file_path))[:80000]
+        text = extract_full_text(str(file_path), apply_vnd_mask=True)
+        return mask_vnd_sensitive_data(text)[:80000] if text else None
     except Exception as exc:
         logger.warning("Не удалось извлечь текст из %s: %s", file_path, exc)
         return None

@@ -3,6 +3,8 @@
  * Загрузка ГОСТ/ФЗ — в карточке «Статистика» (app.js).
  */
 
+const APP_UI_VERSION = '12.07';
+
 const CONFIG_API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
     ? 'http://localhost:8011'
     : '';
@@ -41,8 +43,13 @@ function renderSettingsForm(config) {
     const saveBtn = document.getElementById('btn-settings-save');
     const defaultBtn = document.getElementById('btn-settings-default');
     const foldersEl = document.getElementById('settings-folder-list');
+    const versionEl = document.getElementById('settings-ui-version');
     const dataRoot = config?.data_root || config?.work_folder || '';
     const editable = Boolean(config?.paths_editable);
+
+    if (versionEl) {
+        versionEl.textContent = APP_UI_VERSION;
+    }
 
     if (labelEl) {
         labelEl.textContent = config?.data_root_label || 'Рабочая папка';
@@ -257,6 +264,10 @@ function closeSettingsModal() {
 
 function initSettingsGear() {
     bindSettingsModalHandlers();
+    const versionEl = document.getElementById('settings-ui-version');
+    if (versionEl) {
+        versionEl.textContent = APP_UI_VERSION;
+    }
     document.getElementById('btn-app-settings')?.addEventListener('click', (event) => {
         event.stopPropagation();
         openSettingsModal();

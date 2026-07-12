@@ -864,7 +864,7 @@ def detect_federal_references_from_file(file_path: str) -> Dict:
             "missing_count": 0,
         }
 
-    text = extract_full_text(str(path))
+    text = extract_full_text(str(path), apply_vnd_mask=True)
     if not text.strip():
         return {
             "status": "warning",

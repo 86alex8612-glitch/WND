@@ -101,14 +101,24 @@ def load_text_file(file_path: str) -> List[str]:
         return []
 
 def _is_vnd_upload_path(file_path: str) -> bool:
-    """Файл из папки загрузки ВНД для анализа."""
+    """Файл из папки загрузки ВНД для анализа (IN и подпапки)."""
+    if not file_path:
+        return False
     try:
-        return Path(file_path).resolve().is_relative_to(Path(settings.in_folder).resolve())
-    except (ValueError, OSError):
+        in_root = Path(settings.in_folder).resolve()
+        candidate = Path(file_path)
+        if not candidate.is_absolute():
+            candidate = in_root / candidate
+        resolved = candidate.resolve()
+        if resolved.is_relative_to(in_root):
+            return True
+        same_name = in_root / resolved.name
+        return same_name.is_file() and os.path.samefile(resolved, same_name)
+    except (ValueError, OSError, TypeError):
         return False
 
 
-def extract_full_text(file_path: str) -> str:
+def extract_full_text(file_path: str, *, apply_vnd_mask: bool | None = None) -> str:
     """Извлечь полный текст из документа (PDF, DOCX, TXT)."""
     file_path_obj = Path(file_path)
     if not file_path_obj.exists():
@@ -125,7 +135,8 @@ def extract_full_text(file_path: str) -> str:
         chunks = load_text_file(str(file_path))
 
     text = "\n".join(chunks)
-    if text and _is_vnd_upload_path(str(file_path)):
+    should_mask = apply_vnd_mask if apply_vnd_mask is not None else _is_vnd_upload_path(str(file_path))
+    if text and should_mask:
         from vnd_masking import mask_vnd_sensitive_data
 
         text = mask_vnd_sensitive_data(text)
@@ -270,6 +281,10 @@ def process_folder(folder_path: str, store, collection_name: str) -> Dict:
                     chunks = load_text_file(str(file_path))
                 
                 if chunks:
+                    if collection_name == "vnd":
+                        from vnd_masking import mask_vnd_chunks
+
+                        chunks = mask_vnd_chunks(chunks)
                     import hashlib
                     file_hash = hashlib.md5(str(file_path).encode()).hexdigest()[:8]
                     metadata = [{"source": str(file_path), "filename": file_path.name} for _ in chunks]

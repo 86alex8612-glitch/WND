@@ -173,12 +173,15 @@ class VectorStore:
 
             if source_path and Path(source_path).is_file():
                 from document_loader import extract_full_text
-                return extract_full_text(source_path)[:80000]
+                return extract_full_text(source_path, apply_vnd_mask=True)[:80000]
 
             if not chunks_with_index:
                 return None
             chunks_with_index.sort(key=lambda item: item[0])
-            return "\n".join(chunk for _, chunk in chunks_with_index)[:80000]
+            from vnd_masking import mask_vnd_sensitive_data
+
+            joined = "\n".join(chunk for _, chunk in chunks_with_index)
+            return mask_vnd_sensitive_data(joined)[:80000]
         except Exception:
             return None
     

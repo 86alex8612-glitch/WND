@@ -59,21 +59,6 @@ body {
     background-color: #138496;
 }
 
-.create-ui-version {
-    position: absolute;
-    right: 6px;
-    bottom: 3px;
-    padding: 0;
-    background: none;
-    color: rgba(255, 255, 255, 0.42);
-    font-size: 0.58rem;
-    font-weight: 400;
-    letter-spacing: 0;
-    line-height: 1;
-    pointer-events: none;
-    user-select: none;
-}
-
 .header h1 {
     font-size: 1.275rem;
     font-weight: 500;
@@ -401,6 +386,28 @@ body {
     margin: 0 0 8px;
     font-size: 0.88rem;
     color: #333;
+}
+
+.app-settings-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 16px 0 4px;
+    padding-top: 12px;
+    border-top: 1px solid #dee2e6;
+}
+
+.app-settings-version-label {
+    font-size: 0.88rem;
+    color: #6c757d;
+}
+
+.app-settings-version {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #212529;
+    font-family: Consolas, 'Courier New', monospace;
+    letter-spacing: 0.02em;
 }
 
 .config-folder-list {
