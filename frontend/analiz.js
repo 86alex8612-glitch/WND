@@ -11,6 +11,8 @@ let uploadedFilename = null;
 let detectedFederalRefs = [];
 let allDetectedFederalRefs = [];
 let stage1Data = null;
+let stage1FndRefreshTimer = null;
+let currentApplicableFnd = [];
 let currentVndName = '';
 let lastStage1Answers = null;
 let lastAnalysisReport = '';
@@ -920,6 +922,110 @@ function showStage2ProgressMessage(message = 'Выполняется право�
     }, 180);
 }
 
+function escapeHtml(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function renderApplicableFnd(fndList) {
+    currentApplicableFnd = Array.isArray(fndList) ? fndList : [];
+    const container = document.getElementById('stage1-fnd-list');
+    const block = document.getElementById('stage1-fnd-block');
+    if (!container) return;
+
+    if (!currentApplicableFnd.length) {
+        container.innerHTML = '<p class="stage1-fnd-empty">Применимые ФНД будут определены после выбора параметров организации.</p>';
+        if (block) block.style.display = '';
+        return;
+    }
+
+    const itemsHtml = currentApplicableFnd.map((item, index) => {
+        const role = item.role || 'ФНД';
+        const roleClass = role === 'основной' ? 'primary' : 'secondary';
+        const number = item.number ? ` (${escapeHtml(item.number)})` : '';
+        const type = item.type ? `<span class="stage1-fnd-type">${escapeHtml(item.type)}</span>` : '';
+        const articles = (item.key_articles || []).length
+            ? `<div class="stage1-fnd-articles"><strong>Статьи/пункты:</strong> ${escapeHtml(item.key_articles.join(', '))}</div>`
+            : '';
+        const reason = item.reason
+            ? `<div class="stage1-fnd-reason">${escapeHtml(item.reason)}</div>`
+            : '';
+        return `
+            <div class="stage1-fnd-item">
+                <div class="stage1-fnd-item-head">
+                    <span class="stage1-fnd-index">${index + 1}.</span>
+                    <span class="stage1-fnd-role stage1-fnd-role-${roleClass}">${escapeHtml(role)}</span>
+                    ${type}
+                </div>
+                <div class="stage1-fnd-title">${escapeHtml(item.title || 'ФНД')}${number}</div>
+                ${articles}
+                ${reason}
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = itemsHtml;
+    if (block) block.style.display = '';
+}
+
+function scheduleApplicableFndRefresh() {
+    if (stage1FndRefreshTimer) clearTimeout(stage1FndRefreshTimer);
+    stage1FndRefreshTimer = setTimeout(() => {
+        refreshApplicableFnd().catch(() => {});
+    }, 450);
+}
+
+async function refreshApplicableFnd() {
+    const answers = collectStage1Answers({ silent: true });
+    if (!answers) {
+        renderApplicableFnd([]);
+        return;
+    }
+
+    const container = document.getElementById('stage1-fnd-list');
+    if (container) {
+        container.innerHTML = '<p class="stage1-fnd-loading">Определяю применимые ФНД...</p>';
+    }
+
+    const response = await fetch(`${API_BASE}/api/vnd/applicable-fnd`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            vnd_filename: uploadedFilename || '',
+            vnd_name: currentVndName,
+            stage1: answers,
+        }),
+    });
+
+    if (!response.ok) {
+        if (container) {
+            container.innerHTML = '<p class="stage1-fnd-empty">Не удалось обновить перечень ФНД. Список будет уточнён при анализе.</p>';
+        }
+        return;
+    }
+
+    const data = await response.json();
+    renderApplicableFnd(data.applicable_fnd || []);
+}
+
+function bindStage1FndRefresh() {
+    ['stage1-activity', 'stage1-ownership'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el && !el.dataset.fndBound) {
+            el.dataset.fndBound = '1';
+            el.addEventListener('change', scheduleApplicableFndRefresh);
+        }
+    });
+    const legal = document.getElementById('stage1-legal');
+    if (legal && !legal.dataset.fndBound) {
+        legal.dataset.fndBound = '1';
+        legal.addEventListener('change', scheduleApplicableFndRefresh);
+    }
+}
+
 function populateStage1Form(data) {
     stage1Data = data;
     const options = data.options || {};
@@ -963,6 +1069,9 @@ function populateStage1Form(data) {
         note.className = 'stage1-note';
         note.textContent = 'Уточните параметры перед правовым анализом.';
     }
+
+    renderApplicableFnd(data.applicable_fnd || []);
+    bindStage1FndRefresh();
 }
 
 function collectStage1LowerLevelDocs() {
@@ -984,7 +1093,8 @@ function formatStage1LowerLevelDocs(ids) {
         .join(', ');
 }
 
-function collectStage1Answers() {
+function collectStage1Answers(options = {}) {
+    const silent = options.silent === true;
     const activity = document.getElementById('stage1-activity')?.value || '';
     const ownership = document.getElementById('stage1-ownership')?.value || '';
     const legalSelect = document.getElementById('stage1-legal');
@@ -993,15 +1103,15 @@ function collectStage1Answers() {
         : [];
 
     if (!activity) {
-        alert('Выберите сферу деятельности предприятия');
+        if (!silent) alert('Выберите сферу деятельности предприятия');
         return null;
     }
     if (!ownership) {
-        alert('Выберите форму собственности');
+        if (!silent) alert('Выберите форму собственности');
         return null;
     }
     if (legalAreas.length === 0) {
-        alert('Выберите хотя бы одну область законодательства');
+        if (!silent) alert('Выберите хотя бы одну область законодательства');
         return null;
     }
 
@@ -1010,7 +1120,19 @@ function collectStage1Answers() {
         ownership_form: ownership,
         legal_areas: legalAreas,
         lower_level_documents: collectStage1LowerLevelDocs(),
+        applicable_fnd: currentApplicableFnd,
     };
+}
+
+function formatApplicableFndSummary(fndList) {
+    if (!fndList || !fndList.length) return 'не определены';
+    return fndList
+        .map((item, index) => {
+            const articles = (item.key_articles || []).join(', ');
+            const suffix = articles ? ` (${articles})` : '';
+            return `${index + 1}. ${item.title || 'ФНД'}${suffix}`;
+        })
+        .join('; ');
 }
 
 function renderStage1Summary(stage1) {
@@ -1018,12 +1140,14 @@ function renderStage1Summary(stage1) {
     if (!summary || !stage1) return;
     const areas = (stage1.legal_areas || []).join(', ');
     const lowerLevel = formatStage1LowerLevelDocs(stage1.lower_level_documents);
+    const fndSummary = formatApplicableFndSummary(stage1.applicable_fnd || currentApplicableFnd);
     summary.innerHTML = `
         <strong>Параметры этапа 1:</strong><br>
         Сфера деятельности: ${stage1.activity_sphere || '—'}<br>
         Форма собственности: ${stage1.ownership_form || '—'}<br>
         Области законодательства: ${areas || '—'}<br>
-        Документы нижнего уровня: ${lowerLevel || 'не указаны'}
+        Документы нижнего уровня: ${lowerLevel || 'не указаны'}<br>
+        <strong>Применимые ФНД:</strong> ${escapeHtml(fndSummary)}
     `;
 }
 
@@ -1120,6 +1244,12 @@ async function submitStage1() {
         }
         if (data.stage1) {
             lastStage1Answers = data.stage1;
+            if (data.stage1.applicable_fnd) {
+                currentApplicableFnd = data.stage1.applicable_fnd;
+            } else if (data.applicable_fnd) {
+                currentApplicableFnd = data.applicable_fnd;
+                data.stage1.applicable_fnd = data.applicable_fnd;
+            }
             renderStage1Summary(data.stage1);
         }
 
